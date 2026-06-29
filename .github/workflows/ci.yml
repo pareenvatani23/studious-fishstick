@@ -29,7 +29,7 @@ jobs:
         run: npx expo export --platform ios --output-dir /tmp/ts-export
 
   deploy:
-    name: EAS Update (production channel)
+    name: EAS Update (preview channel)
     needs: verify
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
@@ -46,7 +46,7 @@ jobs:
           COMMIT_MSG: ${{ github.event.head_commit.message }}
         run: |
           if [ -z "$EXPO_TOKEN" ]; then
-            echo "::error::EXPO_TOKEN secret is not set. Add it in repo Settings → Secrets and variables → Actions."
-            exit 1
+            echo "::warning::EXPO_TOKEN secret not set — skipping EAS Update. Add it in Settings → Secrets and variables → Actions to enable auto-deploy."
+            exit 0
           fi
-          npx eas-cli@latest update --branch production --message "$COMMIT_MSG" --non-interactive
+          npx eas-cli@latest update --branch preview --message "$COMMIT_MSG" --non-interactive
