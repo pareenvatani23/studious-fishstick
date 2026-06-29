@@ -117,7 +117,7 @@ function FullHome() {
       <View style={{ flexDirection: 'row', gap: spacing.md, marginTop: spacing.lg }}>
         <Card style={{ flex: 1 }}>
           <AppText size={13} color={c.muted}>Current streak</AppText>
-          <AppText size={26} weight="700" color={c.teal} style={{ marginTop: spacing.xs }}>{stats.currentStreak} <AppText size={14} color={c.text2}>days</AppText></AppText>
+          <AppText size={26} weight="700" color={c.teal} style={{ marginTop: spacing.xs }}>{stats.currentStreak} <AppText size={14} color={c.text2}>{stats.currentStreak === 1 ? 'day' : 'days'}</AppText></AppText>
         </Card>
         <Card style={{ flex: 1 }}>
           <AppText size={13} color={c.muted}>Top pull this week</AppText>

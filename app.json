@@ -2,7 +2,11 @@
   "expo": {
     "name": "TrueShift",
     "slug": "trueshift",
+    "owner": "studious-fishsticks-team",
     "version": "1.0.0",
+    "runtimeVersion": {
+      "policy": "sdkVersion"
+    },
     "orientation": "portrait",
     "scheme": "trueshift",
     "userInterfaceStyle": "dark",
@@ -12,7 +16,9 @@
       "resizeMode": "contain",
       "backgroundColor": "#0E1619"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.trueshift.app"
@@ -25,7 +31,13 @@
       }
     },
     "extra": {
-      "note": "TrueShift MVP — local-only, no backend, no account."
+      "note": "TrueShift MVP — local-only, no backend, no account.",
+      "eas": {
+        "projectId": "0459022a-1966-4945-b0e7-1a0b59355ac0"
+      }
+    },
+    "updates": {
+      "url": "https://u.expo.dev/0459022a-1966-4945-b0e7-1a0b59355ac0"
     }
   }
 }
