@@ -3,70 +3,56 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 /**
  * App state — local-only (AsyncStorage), no account, no network (MVP).
- * Owns: onboarding flag, Easy/Full mode, display name, the shift history, and
- * which lessons have been opened. Display/comfort prefs live in ThemeContext.
+ * Simplified model: the daily action is a "Reset" anchored on a concrete
+ * situation. No Easy/Full modes, no pulls/virtues. Display/comfort prefs live
+ * in ThemeContext.
  */
 
 const STORAGE_KEY = '@trueshift/app';
 
-export type AppMode = 'easy' | 'full';
-export type Outcome = 'done' | 'partly' | 'avoided';
+export type Outcome = 'done' | 'notyet';
 
-export interface Story {
-  whatHappened?: string;
-  mindSaid?: string;
-  emotions?: string[];
-  wantedToDo?: string;
-}
-
-export interface ShiftRecord {
+export interface ResetRecord {
   id: string;
   /** ISO timestamp */
   date: string;
-  mode: AppMode;
-  feelingId?: string; // easy mode
-  pullId?: string; // full mode
-  story?: Story; // full mode
-  responseId?: string;
-  actionId?: string;
-  customAction?: string;
+  /** optional 1–5 "how heavy did it feel" */
+  heaviness?: number;
+  situationId?: string;
+  customSituation?: string;
+  /** optional free note ("add the thought") */
+  note?: string;
+  actionText?: string;
   outcome?: Outcome;
 }
 
 interface AppData {
   onboardingComplete: boolean;
-  mode: AppMode;
   name: string;
-  shifts: ShiftRecord[];
+  resets: ResetRecord[];
   lessonsWatched: string[];
-  patternsSelected: string[]; // from onboarding Pattern Selection (full)
 }
 
 const DEFAULTS: AppData = {
   onboardingComplete: false,
-  mode: 'easy', // Easy mode is the default; Full is opt-in
-  name: 'Sam',
-  shifts: [],
+  name: 'there',
+  resets: [],
   lessonsWatched: [],
-  patternsSelected: [],
 };
 
 export interface Stats {
   currentStreak: number;
-  totalShifts: number;
-  actionsCompleted: number;
-  mostCommonPullId: string | null;
-  mostChosenResponseId: string | null;
+  totalResets: number;
+  actionsDone: number;
+  mostCommonSituationId: string | null;
   weekly: { label: string; value: number }[]; // last 7 days, 0..1 normalized
 }
 
 interface AppStateValue extends AppData {
   hydrated: boolean;
   completeOnboarding: () => void;
-  setMode: (mode: AppMode) => void;
   setName: (name: string) => void;
-  setPatternsSelected: (ids: string[]) => void;
-  recordShift: (shift: Omit<ShiftRecord, 'id' | 'date'>) => void;
+  recordReset: (reset: Omit<ResetRecord, 'id' | 'date'>) => void;
   markLessonWatched: (id: string) => void;
   deleteAllData: () => Promise<void>;
   stats: Stats;
@@ -78,58 +64,45 @@ function dayKey(d: Date): string {
   return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
 }
 
-function computeStats(shifts: ShiftRecord[]): Stats {
-  const totalShifts = shifts.length;
-  const actionsCompleted = shifts.filter((s) => s.outcome === 'done').length;
+function computeStats(resets: ResetRecord[]): Stats {
+  const totalResets = resets.length;
+  const actionsDone = resets.filter((r) => r.outcome === 'done').length;
 
-  // streak: consecutive days (ending today or yesterday) with ≥1 shift
-  const days = new Set(shifts.map((s) => dayKey(new Date(s.date))));
+  // streak: consecutive days (ending today or yesterday) with ≥1 reset
+  const days = new Set(resets.map((r) => dayKey(new Date(r.date))));
   let currentStreak = 0;
   const cursor = new Date();
-  if (!days.has(dayKey(cursor))) cursor.setDate(cursor.getDate() - 1); // grace: count from yesterday
+  if (!days.has(dayKey(cursor))) cursor.setDate(cursor.getDate() - 1); // 1-day grace
   while (days.has(dayKey(cursor))) {
     currentStreak += 1;
     cursor.setDate(cursor.getDate() - 1);
   }
 
-  const mode = (getter: (s: ShiftRecord) => string | undefined): string | null => {
-    const counts: Record<string, number> = {};
-    shifts.forEach((s) => {
-      const v = getter(s);
-      if (v) counts[v] = (counts[v] || 0) + 1;
-    });
-    let best: string | null = null;
-    let bestN = 0;
-    Object.entries(counts).forEach(([k, n]) => {
-      if (n > bestN) {
-        best = k;
-        bestN = n;
-      }
-    });
-    return best;
-  };
+  const counts: Record<string, number> = {};
+  resets.forEach((r) => {
+    if (r.situationId) counts[r.situationId] = (counts[r.situationId] || 0) + 1;
+  });
+  let mostCommonSituationId: string | null = null;
+  let best = 0;
+  Object.entries(counts).forEach(([k, n]) => {
+    if (n > best) {
+      best = n;
+      mostCommonSituationId = k;
+    }
+  });
 
-  // weekly: last 7 calendar days, normalized to the busiest day
   const labels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const buckets: { label: string; count: number }[] = [];
   for (let i = 6; i >= 0; i--) {
     const d = new Date();
     d.setDate(d.getDate() - i);
     const k = dayKey(d);
-    const count = shifts.filter((s) => dayKey(new Date(s.date)) === k).length;
-    buckets.push({ label: labels[d.getDay()], count });
+    buckets.push({ label: labels[d.getDay()], count: resets.filter((r) => dayKey(new Date(r.date)) === k).length });
   }
   const max = Math.max(1, ...buckets.map((b) => b.count));
   const weekly = buckets.map((b) => ({ label: b.label, value: b.count / max }));
 
-  return {
-    currentStreak,
-    totalShifts,
-    actionsCompleted,
-    mostCommonPullId: mode((s) => s.pullId),
-    mostChosenResponseId: mode((s) => s.responseId),
-    weekly,
-  };
+  return { currentStreak, totalResets, actionsDone, mostCommonSituationId, weekly };
 }
 
 export function AppStateProvider({ children }: { children: React.ReactNode }) {
@@ -155,18 +128,16 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const completeOnboarding = useCallback(() => persist({ ...data, onboardingComplete: true }), [persist, data]);
-  const setMode = useCallback((mode: AppMode) => persist({ ...data, mode }), [persist, data]);
   const setName = useCallback((name: string) => persist({ ...data, name }), [persist, data]);
-  const setPatternsSelected = useCallback((patternsSelected: string[]) => persist({ ...data, patternsSelected }), [persist, data]);
 
-  const recordShift = useCallback(
-    (shift: Omit<ShiftRecord, 'id' | 'date'>) => {
-      const record: ShiftRecord = {
-        ...shift,
+  const recordReset = useCallback(
+    (reset: Omit<ResetRecord, 'id' | 'date'>) => {
+      const record: ResetRecord = {
+        ...reset,
         id: `${Date.now()}-${Math.round(Math.random() * 1e6)}`,
         date: new Date().toISOString(),
       };
-      persist({ ...data, shifts: [record, ...data.shifts] });
+      persist({ ...data, resets: [record, ...data.resets] });
     },
     [persist, data]
   );
@@ -184,22 +155,11 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     await AsyncStorage.removeItem(STORAGE_KEY).catch(() => {});
   }, []);
 
-  const stats = useMemo(() => computeStats(data.shifts), [data.shifts]);
+  const stats = useMemo(() => computeStats(data.resets), [data.resets]);
 
   const value = useMemo<AppStateValue>(
-    () => ({
-      ...data,
-      hydrated,
-      completeOnboarding,
-      setMode,
-      setName,
-      setPatternsSelected,
-      recordShift,
-      markLessonWatched,
-      deleteAllData,
-      stats,
-    }),
-    [data, hydrated, completeOnboarding, setMode, setName, setPatternsSelected, recordShift, markLessonWatched, deleteAllData, stats]
+    () => ({ ...data, hydrated, completeOnboarding, setName, recordReset, markLessonWatched, deleteAllData, stats }),
+    [data, hydrated, completeOnboarding, setName, recordReset, markLessonWatched, deleteAllData, stats]
   );
 
   return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>;

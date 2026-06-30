@@ -9,10 +9,10 @@ Native + Expo from the attached design system (`TrueShift.dc.html`). It is
 **not** therapy, not a medical device, and not a crisis service. Local-only MVP:
 no account, no network, no ads, no social feed.
 
-This repo implements the design pixel-faithfully: the 5-theme token system, the
-reusable component primitives, the navigation shell, the onboarding flow, the
-daily Shift loop, Explore, Progress, Profile/settings, theme picker, crisis
-resources, delete-data, and the empty / first-run states.
+It keeps the design system's 5-theme token system, component primitives,
+navigation shell, onboarding, Explore, Progress, Profile/settings, theme picker,
+crisis resources, delete-data and empty states — but the daily experience has
+been simplified to a clinically-grounded **3-tap Reset** (see below).
 
 ---
 
@@ -57,73 +57,50 @@ src/
   data/                      ⚠ stubbed clinical content (see CONTENT_STUBS.md)
     pulls · feelings · responses · actions · reframes · lessons · emotions
   store/
-    AppState.tsx             onboarding, Easy/Full mode, shift history, derived stats (AsyncStorage)
-    ShiftFlow.tsx            in-progress "draft" shift for the daily loop
+    AppState.tsx             onboarding, reset history, derived stats (AsyncStorage)
+    ResetFlow.tsx            in-progress "draft" reset for the daily loop
   components/                Button · Chip · Input · SelectableCard · VideoLessonCard · ProgressBar ·
                              Screen/Card · Header · Settings · EmptyState · ReadAloud · AppText · WaveMark · icons
   navigation/               RootNavigator (onboarding gate) · TabNavigator · types · hooks
   screens/
-    onboarding/  01–07 + Pattern Selection
-    home/        Easy Home (08) + Home Full (10)
-    shift/       Start Shift (11) · Easy Feeling (09) · Emotional Pull (12) · Name the Story (13) ·
-                 Reframe (14) · Steadier Response (15) · Action Selection (16) · Proof Collected (17)
-    explore/     Explore (18) · Video Lesson (19)
-    progress/    Progress (20)
-    profile/     Profile (21) · Theme Picker (22) · Crisis (23) · Info (about/terms/privacy) · Delete Data (24)
+    onboarding/  Splash · Welcome · How it works · Text size · Read aloud · Privacy · Ready
+    home/        Home (one clear action)
+    reset/       StartReset (Reset tab) · Situation · Support · Done   ← the 3-tap loop
+    explore/     Explore · Video Lesson
+    progress/    Progress
+    profile/     Profile · Theme Picker · Crisis · Info (about/terms/privacy) · Delete Data
 ```
 
-### Design screen → implementation map (all 24)
+## The daily Reset (3 taps)
 
-| # | Design | File |
-|---|---|---|
-| 01 | Splash | `onboarding/SplashScreen` |
-| 02 | Welcome | `onboarding/WelcomeScreen` |
-| 03 | How it works | `onboarding/HowItWorksScreen` |
-| 04 | Text size | `onboarding/TextSizeScreen` |
-| 05 | Read aloud | `onboarding/ReadAloudScreen` |
-| 06 | Safety & Privacy | `onboarding/PrivacyScreen` |
-| 07 | Ready | `onboarding/ReadyScreen` |
-| 08 | Easy Home | `home/HomeScreen` (Easy branch) |
-| 09 | Easy Shift step | `shift/EasyFeelingScreen` |
-| 10 | Home (Full) | `home/HomeScreen` (Full branch) |
-| 11 | Start Shift | `shift/StartShiftScreen` (also the Shift tab) |
-| 12 | Emotional Pull | `shift/EmotionalPullScreen` |
-| 13 | Name the Story | `shift/NameStoryScreen` |
-| 14 | Reframe | `shift/ReframeScreen` |
-| 15 | Steadier Response | `shift/SteadierResponseScreen` |
-| 16 | Choose Small Action | `shift/ActionSelectionScreen` |
-| 17 | Proof Collected | `shift/ProofCollectedScreen` |
-| 18 | Explore Library | `explore/ExploreScreen` |
-| 19 | Video Lesson Detail | `explore/VideoLessonScreen` |
-| 20 | Progress | `progress/ProgressScreen` |
-| 21 | Profile / Settings | `profile/ProfileScreen` |
-| 22 | Display & Comfort (themes) | `profile/ThemePickerScreen` |
-| 23 | Crisis Resources | `profile/CrisisResourcesScreen` |
-| 24 | Delete Data | `profile/DeleteDataScreen` |
-| + | Pattern Selection | `onboarding/PatternSelectionScreen` |
+The product is built around one simple, repeatable loop. Plain words, no
+framework to learn — the app does the formulation, the user just taps and reads:
 
----
+1. **Situation** — "What happened?" → pick a concrete everyday situation
+   (+ an optional "how heavy does it feel?" check that gently surfaces support
+   when high).
+2. **Support** — one screen, in clinically-safe order: **validate first** → a
+   reframe shown as *"another way to look at it"* (editable) → **one small step**
+   (a concrete implementation intention, swappable). Optional "add the thought".
+3. **Done** — "How'd it go?" → *I did it / Not yet*. No score, no shame.
+
+> Earlier abstract machinery from the original brief — the 10 "emotional pulls",
+> the virtue/"steadier response" step, multi-field journaling, and the Easy/Full
+> split — was removed after a clinical + UX review: it was the weakest part both
+> for evidence-fidelity (real CBT anchors on a *specific situation*, not trait
+> self-labels) and for retention. See `CONTENT_STUBS.md` and commit history.
 
 ## Themes
 
 Five switchable themes live in `src/theme/themes.ts`, each a complete
 `ThemeColors` token object. `ThemeProvider` swaps the active object; **no
 component hard-codes a hex** — they read `useTheme().theme.colors`. Teal =
-shift/action, lavender = reflection. No pure black/white. Accent tints are
+action, lavender = reflection. No pure black/white. Accent tints are
 derived at runtime via `tint(hex, alpha)`.
-
-## Easy vs Full mode
-
-Easy mode is the **default**; Full mode is opt-in from Profile (which routes
-through Pattern Selection). Same loop, more depth:
-
-- **Easy:** Start → tap a feeling → reframe → pick one small action → done.
-- **Full:** Start → emotional pull → name the story → reframe (with detected
-  CBT pattern chips) → steadier response → small action → proof.
 
 ## Accessibility
 
-- ≥44px tap targets; CTAs 56px (Full) / 64px (Easy).
+- ≥44px tap targets; CTAs 56–60px.
 - Selected state is **border + ✓**, never colour alone (chips, cards, toggles).
 - In-app text size (Normal / Large / Largest) **and** OS Dynamic Type
   (`allowFontScaling`) both scale text via `AppText`.
@@ -144,8 +121,10 @@ through Pattern Selection). Same loop, more depth:
 
 ---
 
-## ⚠ Content is stubbed
+## ⚠ Content is draft, pending clinician review
 
-No clinical copy was invented. Reframes, action descriptions, lesson
-summaries, and legal text are placeholders pending real (clinician-reviewed)
-content. **See [`CONTENT_STUBS.md`](./CONTENT_STUBS.md)** for the full list.
+The situation/validate/reframe/action copy in `src/data/situations.ts` is
+**draft** — written to clinical guardrails (validate-first, reframe-as-editable-
+hypothesis, implementation-intention actions) so the UX is testable, but **not
+clinician-vetted**. Every entry is `copyFinal: false`. Lesson summaries and legal
+text are likewise placeholders. **See [`CONTENT_STUBS.md`](./CONTENT_STUBS.md).**

@@ -16,17 +16,11 @@ import { TextSizeScreen } from '../screens/onboarding/TextSizeScreen';
 import { ReadAloudScreen } from '../screens/onboarding/ReadAloudScreen';
 import { PrivacyScreen } from '../screens/onboarding/PrivacyScreen';
 import { ReadyScreen } from '../screens/onboarding/ReadyScreen';
-import { PatternSelectionScreen } from '../screens/onboarding/PatternSelectionScreen';
 
-// Shift loop
-import { StartShiftScreen } from '../screens/shift/StartShiftScreen';
-import { EasyFeelingScreen } from '../screens/shift/EasyFeelingScreen';
-import { EmotionalPullScreen } from '../screens/shift/EmotionalPullScreen';
-import { NameStoryScreen } from '../screens/shift/NameStoryScreen';
-import { ReframeScreen } from '../screens/shift/ReframeScreen';
-import { SteadierResponseScreen } from '../screens/shift/SteadierResponseScreen';
-import { ActionSelectionScreen } from '../screens/shift/ActionSelectionScreen';
-import { ProofCollectedScreen } from '../screens/shift/ProofCollectedScreen';
+// Reset loop
+import { SituationScreen } from '../screens/reset/SituationScreen';
+import { SupportScreen } from '../screens/reset/SupportScreen';
+import { DoneScreen } from '../screens/reset/DoneScreen';
 
 // Detail / settings
 import { VideoLessonScreen } from '../screens/explore/VideoLessonScreen';
@@ -38,8 +32,8 @@ import { DeleteDataScreen } from '../screens/profile/DeleteDataScreen';
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export function RootNavigator() {
-  const { theme } = useTheme();
   const themeCtx = useTheme();
+  const { theme } = themeCtx;
   const { onboardingComplete, hydrated } = useApp();
 
   const navTheme: NavTheme = {
@@ -81,17 +75,11 @@ export function RootNavigator() {
         ) : (
           <Stack.Group>
             <Stack.Screen name="Main" component={TabNavigator} />
-            {/* shift loop */}
-            <Stack.Screen name="StartShift" component={StartShiftScreen} />
-            <Stack.Screen name="EasyFeeling" component={EasyFeelingScreen} />
-            <Stack.Screen name="EmotionalPull" component={EmotionalPullScreen} />
-            <Stack.Screen name="NameStory" component={NameStoryScreen} />
-            <Stack.Screen name="Reframe" component={ReframeScreen} />
-            <Stack.Screen name="SteadierResponse" component={SteadierResponseScreen} />
-            <Stack.Screen name="ActionSelection" component={ActionSelectionScreen} />
-            <Stack.Screen name="ProofCollected" component={ProofCollectedScreen} />
+            {/* Reset loop */}
+            <Stack.Screen name="ResetSituation" component={SituationScreen} />
+            <Stack.Screen name="ResetSupport" component={SupportScreen} />
+            <Stack.Screen name="ResetDone" component={DoneScreen} />
             {/* detail / settings */}
-            <Stack.Screen name="PatternSelection" component={PatternSelectionScreen} />
             <Stack.Screen name="VideoLesson" component={VideoLessonScreen} />
             <Stack.Screen name="ThemePicker" component={ThemePickerScreen} />
             <Stack.Screen name="CrisisResources" component={CrisisResourcesScreen} />

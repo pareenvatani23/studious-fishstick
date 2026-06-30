@@ -6,51 +6,45 @@ import { Button } from '../../components/Button';
 import { SelectableCard } from '../../components/SelectableCard';
 import { Icon } from '../../components/icons';
 import { useTheme } from '../../theme/ThemeContext';
-import { useApp, Outcome } from '../../store/AppState';
-import { useShiftFlow } from '../../store/ShiftFlow';
+import { useResetFlow } from '../../store/ResetFlow';
 import { useRootNav } from '../../navigation/hooks';
 import { radius, spacing } from '../../theme/tokens';
 
-const OPTIONS: { id: Outcome; title: string; sub: string; success?: boolean }[] = [
-  { id: 'done', title: 'Done', sub: 'You chose a steadier response. That counts.', success: true },
-  { id: 'partly', title: 'Partly done', sub: 'Partial action still builds proof.' },
-  { id: 'avoided', title: 'Avoided it', sub: 'No shame. Avoidance is a pattern, not a failure. Make it smaller.' },
+type Outcome = 'done' | 'notyet';
+
+const OPTIONS: { id: Outcome; title: string; sub: string }[] = [
+  { id: 'done', title: 'I did it', sub: 'That counts. Small steps are how steadier days are built.' },
+  { id: 'notyet', title: 'Not yet', sub: 'No shame — naming it is already a step. You can come back to it.' },
 ];
 
-/** Proof Collected (design 17). Supportive, not judgemental. Commits the shift. */
-export function ProofCollectedScreen() {
+/** Step 3 — gentle close (peak-end). Commits the Reset. Supportive, no pressure. */
+export function DoneScreen() {
   const { theme, tint } = useTheme();
-  const { mode } = useApp();
-  const { update, commit } = useShiftFlow();
+  const { update, commit } = useResetFlow();
   const nav = useRootNav();
   const c = theme.colors;
   const [outcome, setOutcome] = useState<Outcome | undefined>();
 
   const save = () => {
     update({ outcome });
-    commit(mode);
+    commit();
     nav.navigate('Main', { screen: 'HomeTab' } as any);
   };
 
   return (
-    <Screen scroll glow="teal" bottom={<Button label="Save shift" onPress={save} disabled={!outcome} />}>
+    <Screen scroll glow="teal" bottom={<Button label="Save" large onPress={save} disabled={!outcome} />}>
       <View style={{ alignItems: 'center', marginTop: spacing.xxxl, marginBottom: spacing.xl }}>
         <View style={{ width: 96, height: 96, borderRadius: radius.full, backgroundColor: tint(c.success, 0.12), borderWidth: 1.5, borderColor: tint(c.success, 0.5), alignItems: 'center', justifyContent: 'center' }}>
           <Icon name="check" color={c.success} size={40} strokeWidth={2.2} />
         </View>
       </View>
-      <AppText size={28} weight="700" align="center">Proof collected?</AppText>
-      <AppText size={15} color={c.text2} align="center" style={{ marginTop: spacing.md }}>How did it go?</AppText>
+      <AppText size={28} weight="700" align="center">How’d it go?</AppText>
+      <AppText size={15} color={c.text2} align="center" style={{ marginTop: spacing.md }}>
+        Either answer is okay. This is for you, not a score.
+      </AppText>
       <View style={{ gap: spacing.md, marginTop: spacing.xxl }}>
         {OPTIONS.map((o) => (
-          <SelectableCard
-            key={o.id}
-            title={o.title}
-            description={o.sub}
-            intent={o.success ? 'teal' : 'lavender'}
-            selected={outcome === o.id}
-            onPress={() => setOutcome(o.id)}
-          />
+          <SelectableCard key={o.id} title={o.title} description={o.sub} selected={outcome === o.id} onPress={() => setOutcome(o.id)} />
         ))}
       </View>
     </Screen>

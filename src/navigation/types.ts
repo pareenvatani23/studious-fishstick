@@ -2,14 +2,14 @@ import type { NavigatorScreenParams } from '@react-navigation/native';
 
 export type TabParamList = {
   HomeTab: undefined;
-  ShiftTab: undefined;
+  ResetTab: undefined;
   ExploreTab: undefined;
   ProgressTab: undefined;
   YouTab: undefined;
 };
 
 export type RootStackParamList = {
-  // Onboarding (01–07) + Pattern Selection
+  // Onboarding (01–07)
   Splash: undefined;
   Welcome: undefined;
   HowItWorks: undefined;
@@ -17,20 +17,14 @@ export type RootStackParamList = {
   ReadAloud: undefined;
   Privacy: undefined;
   Ready: undefined;
-  PatternSelection: { fromSettings?: boolean } | undefined;
 
   // App shell
   Main: NavigatorScreenParams<TabParamList> | undefined;
 
-  // Daily shift loop (pushed over the tabs)
-  StartShift: undefined;
-  EasyFeeling: undefined;
-  EmotionalPull: undefined;
-  NameStory: undefined;
-  Reframe: undefined;
-  SteadierResponse: undefined;
-  ActionSelection: undefined;
-  ProofCollected: undefined;
+  // Daily Reset loop (3 taps): situation → support → done
+  ResetSituation: undefined;
+  ResetSupport: undefined;
+  ResetDone: undefined;
 
   // Detail / settings
   VideoLesson: { lessonId: string };

@@ -11,7 +11,7 @@ import { ReadAloudIconButton } from '../../components/ReadAloud';
 import { Icon } from '../../components/icons';
 import { useTheme } from '../../theme/ThemeContext';
 import { useApp } from '../../store/AppState';
-import { useShiftFlow } from '../../store/ShiftFlow';
+import { useResetFlow } from '../../store/ResetFlow';
 import { useRootNav } from '../../navigation/hooks';
 import { lessonById } from '../../data/lessons';
 import { radius, spacing } from '../../theme/tokens';
@@ -26,8 +26,8 @@ type Props = NativeStackScreenProps<RootStackParamList, 'VideoLesson'>;
  */
 export function VideoLessonScreen({ route }: Props) {
   const { theme, tint } = useTheme();
-  const { markLessonWatched, mode } = useApp();
-  const { start } = useShiftFlow();
+  const { markLessonWatched } = useApp();
+  const { start } = useResetFlow();
   const nav = useRootNav();
   const c = theme.colors;
   const lesson = lessonById(route.params.lessonId);
@@ -46,7 +46,7 @@ export function VideoLessonScreen({ route }: Props) {
 
   const takeAction = () => {
     start();
-    nav.navigate(mode === 'easy' ? 'EasyFeeling' : 'StartShift');
+    nav.navigate('ResetSituation');
   };
 
   return (

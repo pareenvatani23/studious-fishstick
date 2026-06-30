@@ -9,7 +9,7 @@ import { radius, sizing } from '../theme/tokens';
 import { TabParamList } from './types';
 
 import { HomeScreen } from '../screens/home/HomeScreen';
-import { StartShiftScreen } from '../screens/shift/StartShiftScreen';
+import { StartResetScreen } from '../screens/reset/StartResetScreen';
 import { ExploreScreen } from '../screens/explore/ExploreScreen';
 import { ProgressScreen } from '../screens/progress/ProgressScreen';
 import { ProfileScreen } from '../screens/profile/ProfileScreen';
@@ -18,7 +18,7 @@ const Tab = createBottomTabNavigator<TabParamList>();
 
 const TABS: { name: keyof TabParamList; label: string; icon: IconName }[] = [
   { name: 'HomeTab', label: 'Home', icon: 'home' },
-  { name: 'ShiftTab', label: 'Shift', icon: 'shift' },
+  { name: 'ResetTab', label: 'Reset', icon: 'shift' },
   { name: 'ExploreTab', label: 'Explore', icon: 'explore' },
   { name: 'ProgressTab', label: 'Progress', icon: 'progress' },
   { name: 'YouTab', label: 'You', icon: 'user' },
@@ -78,8 +78,8 @@ export function TabNavigator() {
           component={
             t.name === 'HomeTab'
               ? HomeScreen
-              : t.name === 'ShiftTab'
-              ? StartShiftScreen
+              : t.name === 'ResetTab'
+              ? StartResetScreen
               : t.name === 'ExploreTab'
               ? ExploreScreen
               : t.name === 'ProgressTab'

@@ -1,7 +1,6 @@
 import React from 'react';
 import { Pressable, View, ViewStyle, StyleProp } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
-import { useApp } from '../store/AppState';
 import { AppText } from './AppText';
 import { Icon, IconName } from './icons';
 import { radius, sizing, spacing } from '../theme/tokens';
@@ -13,8 +12,8 @@ import { radius, sizing, spacing } from '../theme/tokens';
  *   text         no chrome, teal label
  *   destructive  danger-tinted surface + danger border/label
  *
- * Height follows Easy/Full mode (64px Easy CTA, 56px otherwise) per the brief.
- * Always ≥44px tap target; label is the accessibility label by default.
+ * Default CTA height 56px; pass `large` for the 60px hero CTA. Always ≥44px tap
+ * target; label is the accessibility label by default.
  */
 export type ButtonVariant = 'primary' | 'secondary' | 'text' | 'destructive';
 
@@ -24,18 +23,18 @@ interface ButtonProps {
   variant?: ButtonVariant;
   disabled?: boolean;
   icon?: IconName;
-  /** override the auto Easy/Full height */
+  /** taller hero CTA */
+  large?: boolean;
+  /** override the height entirely */
   height?: number;
   style?: StyleProp<ViewStyle>;
   accessibilityHint?: string;
 }
 
-export function Button({ label, onPress, variant = 'primary', disabled, icon, height, style, accessibilityHint }: ButtonProps) {
+export function Button({ label, onPress, variant = 'primary', disabled, icon, large, height, style, accessibilityHint }: ButtonProps) {
   const { theme, tint } = useTheme();
-  const { mode } = useApp();
   const c = theme.colors;
-  const easy = mode === 'easy';
-  const h = height ?? (variant === 'text' ? sizing.minTap : easy ? sizing.ctaEasy : sizing.cta);
+  const h = height ?? (variant === 'text' ? sizing.minTap : large ? 60 : sizing.cta);
 
   let bg = c.teal;
   let fg = c.onAccent;
@@ -89,8 +88,8 @@ export function Button({ label, onPress, variant = 'primary', disabled, icon, he
         style,
       ]}
     >
-      {icon && <Icon name={icon} color={disabled ? c.muted : fg} size={easy ? 22 : 20} />}
-      <AppText size={easy ? 19 : 16} weight={easy ? '700' : '600'} color={disabled ? c.muted : fg}>
+      {icon && <Icon name={icon} color={disabled ? c.muted : fg} size={large ? 22 : 20} />}
+      <AppText size={large ? 18 : 16} weight={large ? '700' : '600'} color={disabled ? c.muted : fg}>
         {label}
       </AppText>
     </Pressable>
