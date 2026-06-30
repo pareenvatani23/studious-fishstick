@@ -13,7 +13,7 @@ export type IconName =
   // navigation / chrome
   | 'home' | 'shift' | 'explore' | 'progress' | 'user'
   | 'back' | 'chevronRight' | 'arrowRight' | 'arrowFade'
-  | 'speaker' | 'edit' | 'trash' | 'play' | 'plus'
+  | 'speaker' | 'edit' | 'trash' | 'play' | 'pause' | 'plus'
   // affordances
   | 'check' | 'badgeCheck' | 'eye' | 'shield' | 'shieldCheck'
   // pull / response / feeling glyphs
@@ -65,6 +65,8 @@ export function Icon({ name, size = 24, color, strokeWidth = 1.8 }: IconProps) {
         return <><Path {...p} d="M4 7h16" /><Path {...p} d="M9 7V5h6v2" /><Path {...p} d="M6 7l1 13h10l1-13" /></>;
       case 'play':
         return <Polygon points="8,5 19,12 8,19" fill={color} stroke="none" />;
+      case 'pause':
+        return <><Path {...p} d="M9 5v14" /><Path {...p} d="M15 5v14" /></>;
       case 'plus':
         return <><Path {...p} d="M12 5v14" /><Path {...p} d="M5 12h14" /></>;
       case 'check':

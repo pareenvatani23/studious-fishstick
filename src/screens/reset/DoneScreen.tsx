@@ -20,14 +20,13 @@ const OPTIONS: { id: Outcome; title: string; sub: string }[] = [
 /** Step 3 — gentle close (peak-end). Commits the Reset. Supportive, no pressure. */
 export function DoneScreen() {
   const { theme, tint } = useTheme();
-  const { update, commit } = useResetFlow();
+  const { commit } = useResetFlow();
   const nav = useRootNav();
   const c = theme.colors;
   const [outcome, setOutcome] = useState<Outcome | undefined>();
 
   const save = () => {
-    update({ outcome });
-    commit();
+    commit({ outcome });
     nav.navigate('Main', { screen: 'HomeTab' } as any);
   };
 

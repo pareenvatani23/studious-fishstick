@@ -22,7 +22,11 @@ export interface ResetRecord {
   customSituation?: string;
   /** optional free note ("add the thought") */
   note?: string;
+  reframe?: string;
   actionText?: string;
+  /** AI thought tags + thinking-pattern, for the Insights map */
+  keywords?: string[];
+  distortion?: string;
   outcome?: Outcome;
 }
 

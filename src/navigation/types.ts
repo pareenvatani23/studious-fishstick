@@ -24,6 +24,7 @@ export type RootStackParamList = {
   // Daily Reset loop (3 taps): situation → support → done
   ResetSituation: undefined;
   ResetSupport: undefined;
+  ResetNarration: undefined;
   ResetDone: undefined;
 
   // Detail / settings

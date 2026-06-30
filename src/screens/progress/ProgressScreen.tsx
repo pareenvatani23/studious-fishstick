@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Screen, Card } from '../../components/Screen';
@@ -13,10 +13,13 @@ import { useRootNav } from '../../navigation/hooks';
 import { situationById } from '../../data/situations';
 import { radius, spacing, sizing } from '../../theme/tokens';
 
-/** Progress — reflective, not performance pressure. Mirrors what comes up most. */
+/**
+ * Insights — reflective, not performance pressure. Stats + an AI thought map
+ * (keyword frequency) + recurring thinking patterns, built from tracked resets.
+ */
 export function ProgressScreen() {
   const { theme, tint } = useTheme();
-  const { stats } = useApp();
+  const { stats, resets } = useApp();
   const { start } = useResetFlow();
   const nav = useRootNav();
   const c = theme.colors;
@@ -26,15 +29,28 @@ export function ProgressScreen() {
     nav.navigate('ResetSituation');
   };
 
+  // aggregate AI keywords + distortions
+  const { keywordCloud, patterns } = useMemo(() => {
+    const kw: Record<string, number> = {};
+    const ds: Record<string, number> = {};
+    resets.forEach((r) => {
+      (r.keywords ?? []).forEach((k) => {
+        const key = k.trim().toLowerCase();
+        if (key) kw[key] = (kw[key] || 0) + 1;
+      });
+      const d = (r.distortion ?? '').trim();
+      if (d) ds[d] = (ds[d] || 0) + 1;
+    });
+    const keywordCloud = Object.entries(kw).sort((a, b) => b[1] - a[1]).slice(0, 18);
+    const patterns = Object.entries(ds).sort((a, b) => b[1] - a[1]).slice(0, 5);
+    return { keywordCloud, patterns };
+  }, [resets]);
+
   if (stats.totalResets === 0) {
     return (
       <Screen scroll contentStyle={{ paddingBottom: sizing.tabBar + spacing.xl }}>
-        <AppText size={28} weight="700" style={{ marginTop: spacing.sm }}>Your resets</AppText>
-        <EmptyState
-          icon="progress"
-          title="Nothing here yet"
-          body="Your resets gather here quietly — just for you. Take your first one whenever you’re ready."
-        >
+        <AppText size={28} weight="700" style={{ marginTop: spacing.sm }}>Insights</AppText>
+        <EmptyState icon="progress" title="Nothing here yet" body="As you do resets, you’ll see your patterns here — the thoughts that come up and what helps. Just for you.">
           <View style={{ alignSelf: 'stretch', marginTop: spacing.lg }}>
             <Button label="Start your first reset" onPress={startReset} />
           </View>
@@ -44,10 +60,11 @@ export function ProgressScreen() {
   }
 
   const topSituation = stats.mostCommonSituationId ? situationById(stats.mostCommonSituationId)?.label : null;
+  const maxKw = keywordCloud.length ? keywordCloud[0][1] : 1;
 
   return (
     <Screen scroll contentStyle={{ paddingBottom: sizing.tabBar + spacing.xl }} bottom={<Button label="Start a reset" onPress={startReset} />}>
-      <AppText size={28} weight="700" style={{ marginTop: spacing.sm }}>Your resets</AppText>
+      <AppText size={28} weight="700" style={{ marginTop: spacing.sm }}>Insights</AppText>
 
       <View style={{ flexDirection: 'row', gap: spacing.md, marginTop: spacing.xl }}>
         <Stat value={String(stats.totalResets)} label="Resets" color={c.teal} />
@@ -55,6 +72,45 @@ export function ProgressScreen() {
         <Stat value={String(stats.currentStreak)} label="Days in a row" color={c.lavender} />
       </View>
 
+      {/* Thought map */}
+      <Card style={{ marginTop: spacing.md }}>
+        <SectionLabel>Your thought map</SectionLabel>
+        {keywordCloud.length === 0 ? (
+          <AppText size={14} color={c.text2} lineHeightMultiple={1.5} style={{ marginTop: spacing.md }}>
+            The words behind your resets will gather here as you do a few more.
+          </AppText>
+        ) : (
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.lg, alignItems: 'center' }}>
+            {keywordCloud.map(([word, count]) => {
+              const t = count / maxKw; // 0..1
+              return (
+                <View key={word} style={{ paddingVertical: 6, paddingHorizontal: 12, borderRadius: radius.full, backgroundColor: tint(c.lavender, 0.1 + t * 0.16), borderWidth: c.borderWidth, borderColor: tint(c.lavender, 0.3 + t * 0.3) }}>
+                  <AppText size={13 + Math.round(t * 7)} weight={t > 0.5 ? '700' : '600'} color={c.lavender}>{word}</AppText>
+                </View>
+              );
+            })}
+          </View>
+        )}
+      </Card>
+
+      {/* Thinking patterns */}
+      {patterns.length > 0 && (
+        <Card style={{ marginTop: spacing.md }}>
+          <SectionLabel>Patterns that recur</SectionLabel>
+          <View style={{ gap: spacing.md, marginTop: spacing.lg }}>
+            {patterns.map(([name, count]) => (
+              <View key={name} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <AppText size={15} style={{ flex: 1, textTransform: 'capitalize' }}>{name}</AppText>
+                <View style={{ backgroundColor: tint(c.teal, 0.14), paddingVertical: 4, paddingHorizontal: 10, borderRadius: radius.full }}>
+                  <AppText size={12} weight="600" color={c.teal}>{count}×</AppText>
+                </View>
+              </View>
+            ))}
+          </View>
+        </Card>
+      )}
+
+      {/* Weekly */}
       <Card style={{ marginTop: spacing.md }}>
         <SectionLabel>This week</SectionLabel>
         <View style={{ gap: 11, marginTop: spacing.lg }}>

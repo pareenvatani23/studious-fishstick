@@ -20,7 +20,7 @@ const TABS: { name: keyof TabParamList; label: string; icon: IconName }[] = [
   { name: 'HomeTab', label: 'Home', icon: 'home' },
   { name: 'ResetTab', label: 'Reset', icon: 'shift' },
   { name: 'ExploreTab', label: 'Explore', icon: 'explore' },
-  { name: 'ProgressTab', label: 'Progress', icon: 'progress' },
+  { name: 'ProgressTab', label: 'Insights', icon: 'progress' },
   { name: 'YouTab', label: 'You', icon: 'user' },
 ];
 
