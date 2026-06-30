@@ -29,6 +29,7 @@ export function ProfileScreen() {
       </View>
 
       <ListGroup style={{ marginTop: spacing.lg }}>
+        <SettingsRow label="How TrueShift works" onPress={() => nav.navigate('HowToUse')} />
         <SettingsRow label="Display & comfort" onPress={() => nav.navigate('ThemePicker')} />
         <SettingsRow label="Reminder settings" onPress={() => nav.navigate('Info', { kind: 'about' })} />
         <SettingsRow label="Privacy" onPress={() => nav.navigate('Info', { kind: 'privacy' })} />

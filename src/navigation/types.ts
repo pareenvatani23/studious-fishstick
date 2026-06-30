@@ -28,6 +28,7 @@ export type RootStackParamList = {
 
   // Detail / settings
   VideoLesson: { lessonId: string };
+  HowToUse: undefined;
   ThemePicker: undefined;
   CrisisResources: undefined;
   Info: { kind: 'about' | 'terms' | 'privacy' };

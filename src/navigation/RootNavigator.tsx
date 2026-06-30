@@ -24,6 +24,7 @@ import { DoneScreen } from '../screens/reset/DoneScreen';
 
 // Detail / settings
 import { VideoLessonScreen } from '../screens/explore/VideoLessonScreen';
+import { HowToUseScreen } from '../screens/profile/HowToUseScreen';
 import { ThemePickerScreen } from '../screens/profile/ThemePickerScreen';
 import { CrisisResourcesScreen } from '../screens/profile/CrisisResourcesScreen';
 import { InfoScreen } from '../screens/profile/InfoScreen';
@@ -81,6 +82,7 @@ export function RootNavigator() {
             <Stack.Screen name="ResetDone" component={DoneScreen} />
             {/* detail / settings */}
             <Stack.Screen name="VideoLesson" component={VideoLessonScreen} />
+            <Stack.Screen name="HowToUse" component={HowToUseScreen} />
             <Stack.Screen name="ThemePicker" component={ThemePickerScreen} />
             <Stack.Screen name="CrisisResources" component={CrisisResourcesScreen} />
             <Stack.Screen name="Info" component={InfoScreen} />
