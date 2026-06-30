@@ -3,7 +3,8 @@ import { View, ScrollView, KeyboardAvoidingView, Platform, ViewStyle, StyleProp 
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../theme/ThemeContext';
-import { spacing } from '../theme/tokens';
+import { spacing, sizing } from '../theme/tokens';
+import { AmbientBackground } from './AmbientBackground';
 
 /**
  * Screen shell — SafeArea + 20px horizontal padding (RN notes), themed
@@ -19,14 +20,17 @@ interface ScreenProps {
   glow?: 'teal' | 'lavender' | 'none';
   /** center children vertically (for hero screens) */
   center?: boolean;
+  /** add clearance for the floating tab bar (use on tab-root screens with a pinned bottom) */
+  tabBar?: boolean;
   padHorizontal?: number;
   contentStyle?: StyleProp<ViewStyle>;
 }
 
-export function Screen({ children, scroll, bottom, glow = 'none', center, padHorizontal = spacing.xl, contentStyle }: ScreenProps) {
+export function Screen({ children, scroll, bottom, glow = 'none', center, tabBar, padHorizontal = spacing.xl, contentStyle }: ScreenProps) {
   const { theme, tint } = useTheme();
   const insets = useSafeAreaInsets();
   const c = theme.colors;
+  const bottomPad = Math.max(insets.bottom, spacing.xxl) + (tabBar ? sizing.tabBar : 0);
 
   const inner = (
     <View style={[{ flex: 1, paddingHorizontal: padHorizontal }, center && { justifyContent: 'center' }, contentStyle]}>
@@ -36,6 +40,7 @@ export function Screen({ children, scroll, bottom, glow = 'none', center, padHor
 
   return (
     <View style={{ flex: 1, backgroundColor: c.background }}>
+      <AmbientBackground />
       {glow !== 'none' && (
         <LinearGradient
           colors={[tint(glow === 'teal' ? c.teal : c.lavender, 0.16), 'transparent']}
@@ -58,7 +63,7 @@ export function Screen({ children, scroll, bottom, glow = 'none', center, padHor
             inner
           )}
           {bottom && (
-            <View style={{ paddingHorizontal: padHorizontal, paddingBottom: Math.max(insets.bottom, spacing.xxl), paddingTop: spacing.sm }}>
+            <View style={{ paddingHorizontal: padHorizontal, paddingBottom: bottomPad, paddingTop: spacing.sm }}>
               {bottom}
             </View>
           )}

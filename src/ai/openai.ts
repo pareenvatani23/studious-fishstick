@@ -19,6 +19,7 @@ interface GenerateInput {
   note?: string;
   avoidReframes?: string[];
   avoidSteps?: string[];
+  avoidValidations?: string[];
 }
 
 async function chatJSON(userContent: string, temperature = 0.8): Promise<any> {
@@ -72,12 +73,17 @@ export async function generateReset(input: GenerateInput): Promise<AIReset> {
     input.heaviness ? `They rated how heavy it feels: ${input.heaviness} of 5.` : '',
     input.avoidReframes?.length ? `Do NOT reuse or paraphrase these earlier reframes: ${JSON.stringify(input.avoidReframes)}.` : '',
     input.avoidSteps?.length ? `Do NOT reuse or paraphrase these earlier steps: ${JSON.stringify(input.avoidSteps)}.` : '',
+    input.avoidValidations?.length ? `Do NOT reuse or paraphrase these earlier validations: ${JSON.stringify(input.avoidValidations)}.` : '',
+    `WRITING RULES:`,
+    `- "validate" must be SPECIFIC to this exact situation and varied. NEVER use formulaic openers like "It's normal", "It makes sense", "It's okay", "Many people", "A lot of people", "That's understandable". Reflect back the specific tension in their words instead.`,
+    `- "reframe" must NOT begin with "Another way", "Maybe", "Perhaps", or "Try to" — the app already frames it. Just state the balanced thought warmly and plainly.`,
+    `- Vary phrasing each time; do not sound templated.`,
     `Return minified JSON with exactly these keys:`,
     `{"crisis":false,`,
-    `"validate":"one warm validating sentence (<=140 chars)",`,
-    `"reframe":"a balanced CBT reframe as a hypothesis, starting with 'Another way to look at it:' (<=240 chars)",`,
+    `"validate":"one specific, warm validating sentence, no clichés (<=140 chars)",`,
+    `"reframe":"a balanced CBT alternative thought, plainly stated, no boilerplate prefix (<=240 chars)",`,
     `"smallStep":"one concrete implementation-intention action with a when/where and a tiny time (<=140 chars)",`,
-    `"narration":"a calm 2-4 sentence spoken script that gently says the validation, the reframe, and the step (<=380 chars)",`,
+    `"narration":"a calm 2-4 sentence spoken script weaving the validation, the reframe, and the step naturally (<=380 chars)",`,
     `"keywords":["2-4 short lowercase thought tags, e.g. 'mind-reading','self-criticism'"],`,
     `"distortion":"one plain-language thinking pattern name, or empty string"}`,
   ]

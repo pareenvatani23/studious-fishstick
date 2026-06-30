@@ -43,7 +43,7 @@ export const situations: Situation[] = [
     id: 'unanswered',
     label: 'Someone didn’t reply',
     icon: 'person',
-    validate: 'Waiting on a reply can really get under your skin. That’s a normal thing to feel.',
+    validate: 'Waiting on a reply can really get under your skin — that pull to keep checking is strong.',
     reframe:
       'Another way to look at it: the timing of a reply usually says more about how busy their day is than about you. Silence is missing information, not a verdict.',
     actions: [
@@ -56,7 +56,7 @@ export const situations: Situation[] = [
     id: 'avoiding',
     label: 'Dreading a task',
     icon: 'arrowFade',
-    validate: 'When something feels big, putting it off makes sense — avoidance is how the mind tries to feel safe.',
+    validate: 'When something feels big, the mind reaches for the exit — that’s avoidance at work, not you failing.',
     reframe:
       'Another way to look at it: you don’t have to finish it, or even do it well. Starting for two minutes is usually enough to break the dread.',
     actions: [
@@ -69,7 +69,7 @@ export const situations: Situation[] = [
     id: 'snapped',
     label: 'Snapped at someone',
     icon: 'flame',
-    validate: 'Reacting more sharply than you meant to is human, especially when you’re stretched thin.',
+    validate: 'Snapping when you’re stretched thin happens fast — and you clearly wish it hadn’t.',
     reframe:
       'Another way to look at it: one sharp moment doesn’t define you or the relationship. A small repair now usually matters more than the slip did.',
     actions: [
@@ -82,7 +82,7 @@ export const situations: Situation[] = [
     id: 'compared',
     label: 'Compared myself to someone',
     icon: 'bars',
-    validate: 'Measuring yourself against someone else is easy to fall into — almost everyone does it.',
+    validate: 'Measuring yourself against someone else stings, especially when you’re already feeling low.',
     reframe:
       'Another way to look at it: you’re comparing your full inside story to a thin slice of theirs. It’s rarely a fair match.',
     actions: [
@@ -95,7 +95,7 @@ export const situations: Situation[] = [
     id: 'overwhelmed',
     label: 'Too much at once',
     icon: 'cloud',
-    validate: 'When everything lands at the same time, feeling overwhelmed is a normal response, not a weakness.',
+    validate: 'When everything lands at once, your mind floods — that heaviness is real, not weakness.',
     reframe:
       'Another way to look at it: you can’t hold it all at once, and you don’t have to. The next single step is the only thing that needs your attention right now.',
     actions: [
@@ -121,7 +121,7 @@ export const situations: Situation[] = [
     id: 'somethingElse',
     label: 'Something else',
     icon: 'plus',
-    validate: 'Whatever it is, it’s okay that it’s sitting with you right now.',
+    validate: 'Whatever it is, it’s sitting with you right now — and that deserves a moment.',
     reframe:
       'Another way to look at it: you don’t need to fix the whole thing. Naming it and taking one small step is enough for now.',
     actions: [

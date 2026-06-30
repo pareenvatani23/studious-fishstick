@@ -21,7 +21,8 @@ export async function synthesize(text: string): Promise<string> {
         body: JSON.stringify({
           text,
           model_id: ELEVENLABS_MODEL,
-          voice_settings: { stability: 0.5, similarity_boost: 0.75 },
+          // calm + expressive + steady: moderate stability, high similarity, gentle style
+          voice_settings: { stability: 0.5, similarity_boost: 0.85, style: 0.3, use_speaker_boost: true },
         }),
       }
     );

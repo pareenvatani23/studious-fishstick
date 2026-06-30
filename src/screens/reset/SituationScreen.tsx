@@ -46,13 +46,13 @@ export function SituationScreen() {
 
   const pick = (id: string, label: string) => {
     update({ situationId: id, situationLabel: label, customSituation: undefined });
-    nav.navigate('ResetSupport');
+    nav.navigate('ResetNarration');
   };
 
   const pickCustom = (text: string) => {
     const t = text.trim();
     update({ situationId: 'somethingElse', situationLabel: t || 'Something else', customSituation: t || undefined });
-    nav.navigate('ResetSupport');
+    nav.navigate('ResetNarration');
   };
 
   return (

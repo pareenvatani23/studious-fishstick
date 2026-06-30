@@ -10,10 +10,13 @@ import { Platform } from 'react-native';
 
 export const OPENAI_API_KEY = process.env.EXPO_PUBLIC_OPENAI_API_KEY ?? '';
 export const ELEVENLABS_API_KEY = process.env.EXPO_PUBLIC_ELEVENLABS_API_KEY ?? '';
-export const ELEVENLABS_VOICE_ID = process.env.EXPO_PUBLIC_ELEVENLABS_VOICE_ID ?? 'EXAVITQu4vr4xnSDxMaL';
+// Lily — velvety, confident, mature (calm + expressive). A premade voice that
+// works on the free tier. Override via env.
+export const ELEVENLABS_VOICE_ID = process.env.EXPO_PUBLIC_ELEVENLABS_VOICE_ID ?? 'pFZP5JQG7iQjIQuC4Bku';
 
 export const OPENAI_MODEL = 'gpt-4o-mini';
-export const ELEVENLABS_MODEL = 'eleven_turbo_v2_5';
+// multilingual_v2 is warmer/less harsh than turbo (worth the small extra latency).
+export const ELEVENLABS_MODEL = 'eleven_multilingual_v2';
 
 // Direct browser calls to OpenAI/ElevenLabs are blocked by CORS, so on web we
 // fall back to the static copy + expo-speech. Native (iOS/Android) uses real AI.

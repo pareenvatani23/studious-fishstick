@@ -63,7 +63,7 @@ export function ProgressScreen() {
   const maxKw = keywordCloud.length ? keywordCloud[0][1] : 1;
 
   return (
-    <Screen scroll contentStyle={{ paddingBottom: sizing.tabBar + spacing.xl }} bottom={<Button label="Start a reset" onPress={startReset} />}>
+    <Screen scroll tabBar contentStyle={{ paddingBottom: sizing.tabBar + spacing.xl }} bottom={<Button label="Start a reset" onPress={startReset} />}>
       <AppText size={28} weight="700" style={{ marginTop: spacing.sm }}>Insights</AppText>
 
       <View style={{ flexDirection: 'row', gap: spacing.md, marginTop: spacing.xl }}>

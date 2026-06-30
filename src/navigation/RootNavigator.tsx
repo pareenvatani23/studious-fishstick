@@ -19,7 +19,6 @@ import { ReadyScreen } from '../screens/onboarding/ReadyScreen';
 
 // Reset loop
 import { SituationScreen } from '../screens/reset/SituationScreen';
-import { SupportScreen } from '../screens/reset/SupportScreen';
 import { NarrationScreen } from '../screens/reset/NarrationScreen';
 import { DoneScreen } from '../screens/reset/DoneScreen';
 
@@ -79,7 +78,6 @@ export function RootNavigator() {
             <Stack.Screen name="Main" component={TabNavigator} />
             {/* Reset loop */}
             <Stack.Screen name="ResetSituation" component={SituationScreen} />
-            <Stack.Screen name="ResetSupport" component={SupportScreen} />
             <Stack.Screen name="ResetNarration" component={NarrationScreen} />
             <Stack.Screen name="ResetDone" component={DoneScreen} />
             {/* detail / settings */}
