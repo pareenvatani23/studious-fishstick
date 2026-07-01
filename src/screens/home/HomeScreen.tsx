@@ -27,7 +27,7 @@ export function HomeScreen() {
   };
 
   return (
-    <Screen scroll glow="teal" contentStyle={{ paddingBottom: sizing.tabBar + spacing.xl }}>
+    <Screen scroll glow="teal" video contentStyle={{ paddingBottom: sizing.tabBar + spacing.xl }}>
       <AppText size={17} weight="600" color={c.text2} style={{ marginTop: spacing.sm }}>{greeting()}, {name}</AppText>
       <AppText size={30} weight="700" style={{ marginTop: 2 }}>How are you?</AppText>
 

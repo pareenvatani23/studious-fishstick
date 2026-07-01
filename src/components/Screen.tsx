@@ -23,11 +23,13 @@ interface ScreenProps {
   center?: boolean;
   /** add clearance for the floating tab bar (use on tab-root screens with a pinned bottom) */
   tabBar?: boolean;
+  /** show the looping Higgsfield video background (hero screens only, for battery) */
+  video?: boolean;
   padHorizontal?: number;
   contentStyle?: StyleProp<ViewStyle>;
 }
 
-export function Screen({ children, scroll, bottom, glow = 'none', center, tabBar, padHorizontal = spacing.xl, contentStyle }: ScreenProps) {
+export function Screen({ children, scroll, bottom, glow = 'none', center, tabBar, video, padHorizontal = spacing.xl, contentStyle }: ScreenProps) {
   const { theme, tint } = useTheme();
   const insets = useSafeAreaInsets();
   const c = theme.colors;
@@ -42,7 +44,7 @@ export function Screen({ children, scroll, bottom, glow = 'none', center, tabBar
   return (
     <View style={{ flex: 1, backgroundColor: c.background }}>
       <AmbientBackground />
-      <VideoBackground />
+      {video && <VideoBackground opacity={0.4} />}
       {glow !== 'none' && (
         <LinearGradient
           colors={[tint(glow === 'teal' ? c.teal : c.lavender, 0.16), 'transparent']}

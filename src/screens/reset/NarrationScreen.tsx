@@ -183,7 +183,7 @@ export function NarrationScreen() {
   }
 
   return (
-    <Screen scroll glow="lavender" bottom={<Button label="Continue" large onPress={cont} />}>
+    <Screen scroll glow="lavender" video bottom={<Button label="Continue" large onPress={cont} />}>
       <FlowHeader progress={0.7} onBack={() => { stopAudio(); nav.goBack(); }} />
 
       {/* play control */}

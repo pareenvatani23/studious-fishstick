@@ -38,7 +38,7 @@ export function StartResetScreen() {
   };
 
   return (
-    <Screen glow="teal" center tabBar bottom={<Button label="Begin" large onPress={begin} />}>
+    <Screen glow="teal" center tabBar video bottom={<Button label="Begin" large onPress={begin} />}>
       {nav.canGoBack() && (
         <View style={{ position: 'absolute', top: spacing.sm, left: 0 }}>
           <RoundIconButton icon="back" onPress={() => nav.goBack()} label="Go back" />
