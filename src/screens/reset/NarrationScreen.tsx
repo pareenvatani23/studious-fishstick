@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { View, Pressable, Animated, Easing, ActivityIndicator } from 'react-native';
+import { View, Pressable, Animated, Easing, ActivityIndicator, TextInput } from 'react-native';
 import { Audio } from 'expo-av';
 import * as Speech from 'expo-speech';
 import { Screen, Card } from '../../components/Screen';
@@ -35,7 +35,7 @@ interface Content {
 }
 
 export function NarrationScreen() {
-  const { theme, tint, reduceMotion } = useTheme();
+  const { theme, tint, reduceMotion, scale } = useTheme();
   const { resets } = useApp();
   const { draft, update } = useResetFlow();
   const nav = useRootNav();
@@ -47,6 +47,8 @@ export function NarrationScreen() {
   const [loading, setLoading] = useState(true);
   const [content, setContent] = useState<Content | null>(null);
   const [audio, setAudio] = useState<'idle' | 'preparing' | 'playing' | 'paused'>('idle');
+  const [note, setNote] = useState(draft.note ?? '');
+  const [showNote, setShowNote] = useState(false);
   const soundRef = useRef<Audio.Sound | null>(null);
   const tokenRef = useRef(0); // cancels stale synth requests (prevents double voice)
   const pulse = useRef(new Animated.Value(0.85)).current;
@@ -99,7 +101,11 @@ export function NarrationScreen() {
         soundRef.current = sound;
         setAudio('playing');
         sound.setOnPlaybackStatusUpdate((st) => {
-          if (st.isLoaded && st.didJustFinish) { sound.setPositionAsync(0).catch(() => {}); setAudio('paused'); }
+          // stop cleanly at the end (resetting position alone would resume → loop)
+          if (st.isLoaded && st.didJustFinish) {
+            sound.setStatusAsync({ shouldPlay: false, positionMillis: 0 }).catch(() => {});
+            setAudio('paused');
+          }
         });
         return;
       }
@@ -192,7 +198,7 @@ export function NarrationScreen() {
     if (content) prepare(content.narration); // idle, or paused speech → (re)start
   }, [audio, content, prepare]);
 
-  const cont = async () => { await stopAudio(); nav.navigate('ResetDone'); };
+  const cont = async () => { update({ note: note.trim() || undefined }); await stopAudio(); nav.navigate('ResetDone'); };
 
   if (loading || !content) {
     return (
@@ -243,7 +249,29 @@ export function NarrationScreen() {
         <AppText size={17} weight="600" lineHeightMultiple={1.35}>{content.step}</AppText>
       </Card>
 
-      <Pressable onPress={tryAnother} accessibilityRole="button" accessibilityLabel="Try another" style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, marginTop: spacing.lg, minHeight: 44 }}>
+      {/* optional, intuitive note */}
+      {showNote ? (
+        <Card style={{ marginTop: spacing.md }}>
+          <AppText size={12} weight="600" color={c.muted}>Your note</AppText>
+          <TextInput
+            value={note}
+            onChangeText={setNote}
+            placeholder="Anything you want to remember about this…"
+            placeholderTextColor={c.muted}
+            multiline
+            autoFocus
+            allowFontScaling
+            style={{ color: c.text1, fontSize: scale(15), lineHeight: scale(21), marginTop: spacing.sm, minHeight: scale(48), textAlignVertical: 'top' }}
+          />
+        </Card>
+      ) : (
+        <Pressable onPress={() => setShowNote(true)} accessibilityRole="button" accessibilityLabel="Add a note" style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, marginTop: spacing.md, minHeight: 44 }}>
+          <Icon name="edit" color={c.text2} size={16} />
+          <AppText size={14} color={c.text2}>Add a note</AppText>
+        </Pressable>
+      )}
+
+      <Pressable onPress={tryAnother} accessibilityRole="button" accessibilityLabel="Try another" style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, marginTop: spacing.md, minHeight: 44 }}>
         <Icon name="shift" color={c.text2} size={16} />
         <AppText size={14} color={c.text2}>Try another</AppText>
       </Pressable>

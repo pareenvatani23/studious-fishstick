@@ -35,7 +35,7 @@ async function chatJSON(userContent: string, temperature = 0.8): Promise<any> {
       body: JSON.stringify({
         model: OPENAI_MODEL,
         temperature,
-        max_tokens: 500,
+        max_tokens: 750,
         response_format: { type: 'json_object' },
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
@@ -78,14 +78,15 @@ export async function generateReset(input: GenerateInput): Promise<AIReset> {
     input.avoidValidations?.length ? `Do NOT reuse or paraphrase these earlier validations: ${JSON.stringify(input.avoidValidations)}.` : '',
     `WRITING RULES:`,
     `- "validate" must be SPECIFIC to this exact situation and varied. NEVER use formulaic openers like "It's normal", "It makes sense", "It's okay", "Many people", "A lot of people", "That's understandable". Reflect back the specific tension in their words instead.`,
-    `- "reframe" must NOT begin with "Another way", "Maybe", "Perhaps", or "Try to" — the app already frames it. Just state the balanced thought warmly and plainly.`,
+    `- "reframe" is a fuller cognitive restructuring — 3 to 4 sentences: (1) name the thinking trap gently, (2) offer the balanced alternative thought, (3) give a brief reason it holds up (evidence for/against, grounded in THEIR situation). Do NOT begin with "Another way", "Maybe", "Perhaps", or "Try to". Warm, plain, concrete.`,
+    `- "smallStep": vary the TYPE of step across CBT techniques — behavioural experiment, opposite action, urge-surf/delay, values-based action, grounding, self-compassion, reaching out, or problem-solving — pick the one that best fits this situation. Always concrete, with a when/where and a tiny time.`,
     `- Vary phrasing each time; do not sound templated.`,
     `Return minified JSON with exactly these keys:`,
     `{"crisis":false,`,
     `"validate":"one specific, warm validating sentence, no clichés (<=140 chars)",`,
-    `"reframe":"a balanced CBT alternative thought, plainly stated, no boilerplate prefix (<=240 chars)",`,
-    `"smallStep":"one concrete implementation-intention action with a when/where and a tiny time (<=140 chars)",`,
-    `"narration":"a calm 2-4 sentence spoken script weaving the validation, the reframe, and the step naturally (<=380 chars)",`,
+    `"reframe":"3-4 sentence balanced cognitive reframe with a brief supporting reason, no boilerplate prefix (<=520 chars)",`,
+    `"smallStep":"one concrete action (varied CBT technique) with a when/where and a tiny time (<=140 chars)",`,
+    `"narration":"a calm 3-5 sentence spoken script weaving the validation, the reframe, and the step naturally (<=520 chars)",`,
     `"keywords":["2-4 short lowercase thought tags, e.g. 'mind-reading','self-criticism'"],`,
     `"distortion":"one plain-language thinking pattern name, or empty string"}`,
   ]

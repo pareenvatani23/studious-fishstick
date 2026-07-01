@@ -17,13 +17,11 @@ import { aiEnabled } from '../../ai/config';
 import { suggestSituations } from '../../ai/openai';
 import { radius, spacing, sizing } from '../../theme/tokens';
 
-const READ = 'How heavy does it feel right now? Then, what happened? Tap the one that fits best.';
-
 /**
- * Step 1 — concrete situation + optional heaviness check (severity routing).
- * When AI is on, a few personalised situations (from the user's history) are
- * appended below the fixed base list. "Something else" captures free text that
- * the AI uses to personalise.
+ * Step 1 of the reset — a short wizard, ONE question per screen (low cognitive
+ * load): heaviness → feeling → what happened. Heaviness + feeling are optional
+ * (Skip); "what happened" is the choice that advances to the reset. Heaviness ≥4
+ * gently surfaces crisis support (severity routing).
  */
 export function SituationScreen() {
   const { theme, tint } = useTheme();
@@ -32,6 +30,7 @@ export function SituationScreen() {
   const nav = useRootNav();
   const c = theme.colors;
 
+  const [step, setStep] = useState(0); // 0 heaviness · 1 feeling · 2 situation
   const [heaviness, setHeaviness] = useState<number | undefined>();
   const [emotion, setEmotion] = useState<string | undefined>();
   const [extra, setExtra] = useState<string[]>([]);
@@ -47,101 +46,123 @@ export function SituationScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const back = () => (step > 0 ? setStep(step - 1) : nav.goBack());
+
   const pick = (id: string, label: string) => {
-    update({ situationId: id, situationLabel: label, customSituation: undefined, emotion });
+    update({ situationId: id, situationLabel: label, customSituation: undefined, heaviness, emotion });
     nav.navigate('ResetNarration');
   };
-
   const pickCustom = (text: string) => {
     const t = text.trim();
-    update({ situationId: 'somethingElse', situationLabel: t || 'Something else', customSituation: t || undefined, emotion });
+    update({ situationId: 'somethingElse', situationLabel: t || 'Something else', customSituation: t || undefined, heaviness, emotion });
     nav.navigate('ResetNarration');
   };
 
-  const toggleEmotion = (e: string) => setEmotion((cur) => (cur === e ? undefined : e));
+  const progress = 0.15 + step * 0.12;
 
   return (
-    <Screen scroll contentStyle={{ paddingBottom: sizing.tabBar + spacing.xl }}>
-      <FlowHeader progress={0.33} onBack={() => nav.goBack()} readAloudText={READ} />
+    <Screen
+      scroll={step === 2}
+      contentStyle={step === 2 ? { paddingBottom: sizing.tabBar + spacing.xl } : undefined}
+      bottom={step < 2 ? (
+        <View style={{ gap: spacing.sm }}>
+          <Button label="Continue" large onPress={() => setStep(step + 1)} />
+          <Pressable onPress={() => setStep(step + 1)} accessibilityRole="button" accessibilityLabel="Skip" style={{ alignItems: 'center', minHeight: 40, justifyContent: 'center' }}>
+            <AppText size={14} color={c.muted}>Skip</AppText>
+          </Pressable>
+        </View>
+      ) : undefined}
+    >
+      <FlowHeader progress={progress} onBack={back} readAloudText={step === 0 ? 'How heavy does it feel right now?' : step === 1 ? "What's the feeling?" : 'What happened? Tap the one that fits best.'} />
 
-      <AppText size={15} color={c.text2}>How heavy does it feel right now?</AppText>
-      <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md }}>
-        {[1, 2, 3, 4, 5].map((n) => {
-          const on = heaviness === n;
-          return (
-            <Pressable
-              key={n}
-              onPress={() => { setHeaviness(n); update({ heaviness: n }); }}
-              accessibilityRole="button"
-              accessibilityLabel={`Heaviness ${n} of 5`}
-              accessibilityState={{ selected: on }}
-              style={{ flex: 1, height: sizing.minTap, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', backgroundColor: on ? tint(c.teal, 0.16) : c.card, borderWidth: on ? 1.5 : c.borderWidth, borderColor: on ? c.teal : c.border }}
-            >
-              <AppText size={16} weight={on ? '700' : '500'} color={on ? c.teal : c.text2}>{n}</AppText>
+      {/* STEP 0 — heaviness */}
+      {step === 0 && (
+        <View style={{ marginTop: spacing.xxxl }}>
+          <AppText size={28} weight="700" lineHeightMultiple={1.2}>How heavy does it feel right now?</AppText>
+          <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xxl }}>
+            {[1, 2, 3, 4, 5].map((n) => {
+              const on = heaviness === n;
+              return (
+                <Pressable
+                  key={n}
+                  onPress={() => { setHeaviness(on ? undefined : n); update({ heaviness: on ? undefined : n }); }}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Heaviness ${n} of 5`}
+                  accessibilityState={{ selected: on }}
+                  style={{ flex: 1, height: 64, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center', backgroundColor: on ? tint(c.teal, 0.16) : c.card, borderWidth: on ? 1.5 : c.borderWidth, borderColor: on ? c.teal : c.border }}
+                >
+                  <AppText size={20} weight={on ? '700' : '500'} color={on ? c.teal : c.text2}>{n}</AppText>
+                </Pressable>
+              );
+            })}
+          </View>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: spacing.sm }}>
+            <AppText size={13} color={c.muted}>Light</AppText>
+            <AppText size={13} color={c.muted}>Heavy</AppText>
+          </View>
+          {heaviness !== undefined && heaviness >= 4 && (
+            <Pressable onPress={() => nav.navigate('CrisisResources')} accessibilityRole="button" accessibilityLabel="See urgent support options">
+              <Card intent="accent" style={{ marginTop: spacing.xl, borderColor: tint(c.lavender, 0.4), flexDirection: 'row', gap: spacing.md, alignItems: 'center' }}>
+                <Icon name="heart" color={c.lavender} size={22} />
+                <View style={{ flex: 1 }}>
+                  <AppText size={14} weight="600">That sounds like a lot to carry.</AppText>
+                  <AppText size={13} color={c.text2} lineHeightMultiple={1.4} style={{ marginTop: 2 }}>You can keep going here — and support is one tap away if you need it.</AppText>
+                </View>
+                <Icon name="chevronRight" color={c.muted} size={18} />
+              </Card>
             </Pressable>
-          );
-        })}
-      </View>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: spacing.xs }}>
-        <AppText size={12} color={c.muted}>Light</AppText>
-        <AppText size={12} color={c.muted}>Heavy</AppText>
-      </View>
-
-      {heaviness !== undefined && heaviness >= 4 && (
-        <Pressable onPress={() => nav.navigate('CrisisResources')} accessibilityRole="button" accessibilityLabel="See urgent support options">
-          <Card intent="accent" style={{ marginTop: spacing.lg, borderColor: tint(c.lavender, 0.4), flexDirection: 'row', gap: spacing.md, alignItems: 'center' }}>
-            <Icon name="heart" color={c.lavender} size={22} />
-            <View style={{ flex: 1 }}>
-              <AppText size={14} weight="600">That sounds like a lot to carry.</AppText>
-              <AppText size={13} color={c.text2} lineHeightMultiple={1.4} style={{ marginTop: 2 }}>You can keep going here — and support is one tap away if you need it.</AppText>
-            </View>
-            <Icon name="chevronRight" color={c.muted} size={18} />
-          </Card>
-        </Pressable>
+          )}
+        </View>
       )}
 
-      <AppText size={15} color={c.text2} style={{ marginTop: spacing.xl }}>What’s the feeling? <AppText size={13} color={c.muted}>(optional)</AppText></AppText>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.md }}>
-        {emotions.map((e) => (
-          <Chip key={e} label={e} intent="lavender" selected={emotion === e} onPress={() => toggleEmotion(e)} />
-        ))}
-      </View>
+      {/* STEP 1 — feeling */}
+      {step === 1 && (
+        <View style={{ marginTop: spacing.xxxl }}>
+          <AppText size={28} weight="700" lineHeightMultiple={1.2}>What’s the feeling?</AppText>
+          <AppText size={15} color={c.text2} style={{ marginTop: spacing.md }}>Naming it helps it settle. Optional.</AppText>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginTop: spacing.xl }}>
+            {emotions.map((e) => (
+              <Chip key={e} label={e} intent="lavender" selected={emotion === e} onPress={() => setEmotion(emotion === e ? undefined : e)} />
+            ))}
+          </View>
+        </View>
+      )}
 
-      <AppText size={26} weight="700" style={{ marginTop: spacing.xxl }}>What happened?</AppText>
-      <AppText size={14} color={c.text2} style={{ marginTop: spacing.sm }}>Tap the one that fits best.</AppText>
-
-      <View style={{ gap: spacing.md, marginTop: spacing.lg }}>
-        {situations.filter((s) => s.id !== 'somethingElse').map((s) => (
-          <SelectableCard key={s.id} title={s.label} icon={s.icon} onPress={() => pick(s.id, s.label)} />
-        ))}
-
-        {/* personalised suggestions */}
-        {extra.map((label) => (
-          <SelectableCard key={`x-${label}`} title={label} icon="sparkle" intent="lavender" onPress={() => pickCustom(label)} />
-        ))}
-
-        {/* something else (free text) */}
-        {customOpen ? (
-          <Card>
-            <AppText size={12} weight="600" color={c.muted}>In your words</AppText>
-            <TextInput
-              value={customText}
-              onChangeText={setCustomText}
-              placeholder="What happened?"
-              placeholderTextColor={c.muted}
-              autoFocus
-              multiline
-              allowFontScaling
-              style={{ color: c.text1, fontSize: 16, marginTop: spacing.sm, minHeight: 44, textAlignVertical: 'top' }}
-            />
-            <View style={{ marginTop: spacing.md }}>
-              <Button label="Continue" onPress={() => pickCustom(customText)} disabled={!customText.trim()} />
-            </View>
-          </Card>
-        ) : (
-          <SelectableCard title="Something else" icon="plus" onPress={() => setCustomOpen(true)} />
-        )}
-      </View>
+      {/* STEP 2 — what happened */}
+      {step === 2 && (
+        <View>
+          <AppText size={28} weight="700" style={{ marginTop: spacing.lg }}>What happened?</AppText>
+          <AppText size={14} color={c.text2} style={{ marginTop: spacing.sm }}>Tap the one that fits best.</AppText>
+          <View style={{ gap: spacing.md, marginTop: spacing.lg }}>
+            {situations.filter((s) => s.id !== 'somethingElse').map((s) => (
+              <SelectableCard key={s.id} title={s.label} icon={s.icon} onPress={() => pick(s.id, s.label)} />
+            ))}
+            {extra.map((label) => (
+              <SelectableCard key={`x-${label}`} title={label} icon="sparkle" intent="lavender" onPress={() => pickCustom(label)} />
+            ))}
+            {customOpen ? (
+              <Card>
+                <AppText size={12} weight="600" color={c.muted}>In your words</AppText>
+                <TextInput
+                  value={customText}
+                  onChangeText={setCustomText}
+                  placeholder="What happened?"
+                  placeholderTextColor={c.muted}
+                  autoFocus
+                  multiline
+                  allowFontScaling
+                  style={{ color: c.text1, fontSize: 16, marginTop: spacing.sm, minHeight: 44, textAlignVertical: 'top' }}
+                />
+                <View style={{ marginTop: spacing.md }}>
+                  <Button label="Continue" onPress={() => pickCustom(customText)} disabled={!customText.trim()} />
+                </View>
+              </Card>
+            ) : (
+              <SelectableCard title="Something else" icon="plus" onPress={() => setCustomOpen(true)} />
+            )}
+          </View>
+        </View>
+      )}
     </Screen>
   );
 }
