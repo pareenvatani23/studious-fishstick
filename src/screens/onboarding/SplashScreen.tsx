@@ -4,7 +4,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Screen } from '../../components/Screen';
 import { AppText } from '../../components/AppText';
 import { Button } from '../../components/Button';
-import { WaveMark } from '../../components/WaveMark';
+import { AnimatedLogo } from '../../components/AnimatedLogo';
 import { useTheme } from '../../theme/ThemeContext';
 import { radius, spacing } from '../../theme/tokens';
 import { RootStackParamList } from '../../navigation/types';
@@ -49,7 +49,7 @@ export function SplashScreen({ navigation }: Props) {
             elevation: 8,
           }}
         >
-          <WaveMark size={124} />
+          <AnimatedLogo size={124} />
         </Animated.View>
         <View style={{ alignItems: 'center', gap: spacing.md }}>
           <AppText size={33} weight="700" letterSpacing={-0.6}>TrueShift</AppText>

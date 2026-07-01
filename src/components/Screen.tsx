@@ -5,6 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../theme/ThemeContext';
 import { spacing, sizing } from '../theme/tokens';
 import { AmbientBackground } from './AmbientBackground';
+import { VideoBackground } from './VideoBackground';
 
 /**
  * Screen shell — SafeArea + 20px horizontal padding (RN notes), themed
@@ -41,6 +42,7 @@ export function Screen({ children, scroll, bottom, glow = 'none', center, tabBar
   return (
     <View style={{ flex: 1, backgroundColor: c.background }}>
       <AmbientBackground />
+      <VideoBackground />
       {glow !== 'none' && (
         <LinearGradient
           colors={[tint(glow === 'teal' ? c.teal : c.lavender, 0.16), 'transparent']}
