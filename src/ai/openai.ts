@@ -16,6 +16,7 @@ interface GenerateInput {
   situationLabel: string;
   customSituation?: string;
   heaviness?: number;
+  emotion?: string;
   note?: string;
   avoidReframes?: string[];
   avoidSteps?: string[];
@@ -69,6 +70,7 @@ export async function generateReset(input: GenerateInput): Promise<AIReset> {
   const prompt = [
     `Situation the user picked: "${input.situationLabel}".`,
     input.customSituation ? `In their words: "${input.customSituation}".` : '',
+    input.emotion ? `They named the feeling as: "${input.emotion}". Acknowledge this emotion by name in the validation.` : '',
     input.note ? `The thought underneath: "${input.note}".` : '',
     input.heaviness ? `They rated how heavy it feels: ${input.heaviness} of 5.` : '',
     input.avoidReframes?.length ? `Do NOT reuse or paraphrase these earlier reframes: ${JSON.stringify(input.avoidReframes)}.` : '',

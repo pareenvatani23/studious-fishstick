@@ -5,12 +5,14 @@ import { AppText } from '../../components/AppText';
 import { Button } from '../../components/Button';
 import { FlowHeader } from '../../components/Header';
 import { SelectableCard } from '../../components/SelectableCard';
+import { Chip } from '../../components/Chip';
 import { Icon } from '../../components/icons';
 import { useTheme } from '../../theme/ThemeContext';
 import { useApp } from '../../store/AppState';
 import { useResetFlow } from '../../store/ResetFlow';
 import { useRootNav } from '../../navigation/hooks';
 import { situations, situationById } from '../../data/situations';
+import { emotions } from '../../data/emotions';
 import { aiEnabled } from '../../ai/config';
 import { suggestSituations } from '../../ai/openai';
 import { radius, spacing, sizing } from '../../theme/tokens';
@@ -31,6 +33,7 @@ export function SituationScreen() {
   const c = theme.colors;
 
   const [heaviness, setHeaviness] = useState<number | undefined>();
+  const [emotion, setEmotion] = useState<string | undefined>();
   const [extra, setExtra] = useState<string[]>([]);
   const [customOpen, setCustomOpen] = useState(false);
   const [customText, setCustomText] = useState('');
@@ -45,15 +48,17 @@ export function SituationScreen() {
   }, []);
 
   const pick = (id: string, label: string) => {
-    update({ situationId: id, situationLabel: label, customSituation: undefined });
+    update({ situationId: id, situationLabel: label, customSituation: undefined, emotion });
     nav.navigate('ResetNarration');
   };
 
   const pickCustom = (text: string) => {
     const t = text.trim();
-    update({ situationId: 'somethingElse', situationLabel: t || 'Something else', customSituation: t || undefined });
+    update({ situationId: 'somethingElse', situationLabel: t || 'Something else', customSituation: t || undefined, emotion });
     nav.navigate('ResetNarration');
   };
+
+  const toggleEmotion = (e: string) => setEmotion((cur) => (cur === e ? undefined : e));
 
   return (
     <Screen scroll contentStyle={{ paddingBottom: sizing.tabBar + spacing.xl }}>
@@ -94,6 +99,13 @@ export function SituationScreen() {
           </Card>
         </Pressable>
       )}
+
+      <AppText size={15} color={c.text2} style={{ marginTop: spacing.xl }}>What’s the feeling? <AppText size={13} color={c.muted}>(optional)</AppText></AppText>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.md }}>
+        {emotions.map((e) => (
+          <Chip key={e} label={e} intent="lavender" selected={emotion === e} onPress={() => toggleEmotion(e)} />
+        ))}
+      </View>
 
       <AppText size={26} weight="700" style={{ marginTop: spacing.xxl }}>What happened?</AppText>
       <AppText size={14} color={c.text2} style={{ marginTop: spacing.sm }}>Tap the one that fits best.</AppText>

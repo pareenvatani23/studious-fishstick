@@ -46,8 +46,9 @@ export function NarrationScreen() {
 
   const [loading, setLoading] = useState(true);
   const [content, setContent] = useState<Content | null>(null);
-  const [playing, setPlaying] = useState(false);
+  const [audio, setAudio] = useState<'idle' | 'preparing' | 'playing' | 'paused'>('idle');
   const soundRef = useRef<Audio.Sound | null>(null);
+  const tokenRef = useRef(0); // cancels stale synth requests (prevents double voice)
   const pulse = useRef(new Animated.Value(0.85)).current;
 
   const recent = {
@@ -68,33 +69,47 @@ export function NarrationScreen() {
   }, [pulse, reduceMotion]);
 
   const stopAudio = useCallback(async () => {
+    tokenRef.current += 1; // invalidate any in-flight synth
     Speech.stop();
-    if (soundRef.current) {
-      try { await soundRef.current.unloadAsync(); } catch {}
-      soundRef.current = null;
-    }
-    setPlaying(false);
+    const s = soundRef.current;
+    soundRef.current = null;
+    if (s) { try { await s.unloadAsync(); } catch {} }
+    setAudio('idle');
   }, []);
 
-  const play = useCallback(async (text: string) => {
+  /**
+   * Synthesize (or speak) then play ONE instance. Token-guarded so a second
+   * call while the first synth is in flight cancels the first — no double voice.
+   * Shows a 'preparing' state while the audio downloads.
+   */
+  const prepare = useCallback(async (text: string) => {
     if (!text) return;
-    await stopAudio();
+    // tear down any existing sound first
+    Speech.stop();
+    if (soundRef.current) { const s = soundRef.current; soundRef.current = null; try { await s.unloadAsync(); } catch {} }
+    const token = ++tokenRef.current;
+    setAudio('preparing');
     try {
       if (voiceEnabled) {
         await Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
         const uri = await synthesize(text);
+        if (token !== tokenRef.current) return; // superseded
         const { sound } = await Audio.Sound.createAsync({ uri }, { shouldPlay: true });
+        if (token !== tokenRef.current) { try { await sound.unloadAsync(); } catch {} return; }
         soundRef.current = sound;
-        setPlaying(true);
-        sound.setOnPlaybackStatusUpdate((s) => { if (s.isLoaded && s.didJustFinish) setPlaying(false); });
+        setAudio('playing');
+        sound.setOnPlaybackStatusUpdate((st) => {
+          if (st.isLoaded && st.didJustFinish) { sound.setPositionAsync(0).catch(() => {}); setAudio('paused'); }
+        });
         return;
       }
     } catch {
-      // fall through to device speech
+      if (token !== tokenRef.current) return;
     }
-    setPlaying(true);
-    Speech.speak(text, { rate: 0.92, onDone: () => setPlaying(false), onStopped: () => setPlaying(false) });
-  }, [stopAudio]);
+    if (token !== tokenRef.current) return;
+    setAudio('playing');
+    Speech.speak(text, { rate: 0.92, onDone: () => setAudio('paused'), onStopped: () => {} });
+  }, []);
 
   const fallbackContent = useCallback((): Content => ({
     validate: situation.validate,
@@ -114,6 +129,7 @@ export function NarrationScreen() {
           situationLabel: label,
           customSituation: draft.customSituation,
           heaviness: draft.heaviness,
+          emotion: draft.emotion,
           note: draft.note,
           avoidReframes: avoidR,
           avoidSteps: avoidS,
@@ -148,7 +164,7 @@ export function NarrationScreen() {
     (async () => {
       setLoading(true);
       const ct = await generate(recent.reframes.slice(0, 6), recent.steps.slice(0, 6));
-      if (ct) { apply(ct); setLoading(false); play(ct.narration); }
+      if (ct) { apply(ct); setLoading(false); prepare(ct.narration); }
     })();
     return () => { stopAudio(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -159,13 +175,22 @@ export function NarrationScreen() {
     await stopAudio();
     setLoading(true);
     const ct = await generate([content.reframe, ...recent.reframes].slice(0, 6), [content.step, ...recent.steps].slice(0, 6));
-    if (ct) { apply(ct); setLoading(false); play(ct.narration); }
+    if (ct) { apply(ct); setLoading(false); prepare(ct.narration); }
   };
 
-  const toggle = () => {
-    if (playing) stopAudio();
-    else if (content) play(content.narration);
-  };
+  const toggle = useCallback(async () => {
+    if (audio === 'preparing') return; // ignore taps while downloading
+    if (audio === 'playing') {
+      if (soundRef.current) { try { await soundRef.current.pauseAsync(); } catch {} setAudio('paused'); }
+      else { Speech.stop(); setAudio('paused'); }
+      return;
+    }
+    if (audio === 'paused' && soundRef.current) {
+      try { await soundRef.current.playAsync(); } catch {} setAudio('playing');
+      return;
+    }
+    if (content) prepare(content.narration); // idle, or paused speech → (re)start
+  }, [audio, content, prepare]);
 
   const cont = async () => { await stopAudio(); nav.navigate('ResetDone'); };
 
@@ -188,16 +213,20 @@ export function NarrationScreen() {
 
       {/* play control */}
       <View style={{ alignItems: 'center', marginTop: spacing.sm, marginBottom: spacing.xl }}>
-        <Pressable onPress={toggle} accessibilityRole="button" accessibilityLabel={playing ? 'Pause voice' : 'Play voice'}>
-          <Animated.View style={{ width: 132, height: 132, borderRadius: radius.full, backgroundColor: tint(c.lavender, 0.12), borderWidth: 1.5, borderColor: tint(c.teal, 0.4), alignItems: 'center', justifyContent: 'center', transform: [{ scale: reduceMotion ? 1 : pulse }] }}>
+        <Pressable onPress={toggle} accessibilityRole="button" accessibilityLabel={audio === 'playing' ? 'Pause voice' : audio === 'preparing' ? 'Preparing voice' : 'Play voice'}>
+          <Animated.View style={{ width: 132, height: 132, borderRadius: radius.full, backgroundColor: tint(c.lavender, 0.12), borderWidth: 1.5, borderColor: tint(c.teal, 0.4), alignItems: 'center', justifyContent: 'center', transform: [{ scale: reduceMotion || audio !== 'playing' ? 1 : pulse }] }}>
             <WaveMark size={76} />
             <View style={{ position: 'absolute', bottom: -4, right: -4, width: 44, height: 44, borderRadius: radius.full, backgroundColor: c.teal, alignItems: 'center', justifyContent: 'center' }}>
-              <Icon name={playing ? 'pause' : 'play'} color={c.onAccent} size={18} />
+              {audio === 'preparing' ? (
+                <ActivityIndicator color={c.onAccent} size="small" />
+              ) : (
+                <Icon name={audio === 'playing' ? 'pause' : 'play'} color={c.onAccent} size={18} />
+              )}
             </View>
           </Animated.View>
         </Pressable>
-        <AppText size={12} weight="700" color={c.muted} uppercase letterSpacing={1} style={{ marginTop: spacing.md }}>
-          {playing ? 'Playing' : 'Tap to hear it'}
+        <AppText size={12} weight="700" color={audio === 'preparing' ? c.lavender : c.muted} uppercase letterSpacing={1} style={{ marginTop: spacing.md }}>
+          {audio === 'preparing' ? 'Preparing voice…' : audio === 'playing' ? 'Playing' : 'Tap to hear it'}
         </AppText>
       </View>
 

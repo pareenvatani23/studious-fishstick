@@ -18,6 +18,8 @@ export interface ResetRecord {
   date: string;
   /** optional 1–5 "how heavy did it feel" */
   heaviness?: number;
+  /** optional one-tap emotion label (affect labeling) */
+  emotion?: string;
   situationId?: string;
   customSituation?: string;
   /** optional free note ("add the thought") */

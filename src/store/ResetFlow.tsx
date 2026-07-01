@@ -11,6 +11,7 @@ import { useApp } from './AppState';
  */
 interface Draft {
   heaviness?: number;
+  emotion?: string;
   situationId?: string;
   situationLabel?: string;
   customSituation?: string;
@@ -56,6 +57,7 @@ export function ResetFlowProvider({ children }: { children: React.ReactNode }) {
       draftRef.current = d;
       recordReset({
         heaviness: d.heaviness,
+        emotion: d.emotion,
         situationId: d.situationId,
         customSituation: d.customSituation,
         note: d.note,
