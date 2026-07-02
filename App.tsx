@@ -9,7 +9,7 @@ import { AuthProvider } from './src/supabase/auth';
 import { RootNavigator } from './src/navigation/RootNavigator';
 import { AnimatedSplash } from './src/components/AnimatedSplash';
 import { useReminderSync } from './src/notifications/useReminderSync';
-import { useCloudSync } from './src/supabase/useCloudSync';
+import { usePushRegistration } from './src/notifications/usePushRegistration';
 
 /**
  * TrueShift — your daily reset for a steadier mind.
@@ -52,23 +52,23 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <ThemeProvider>
-        <AuthProvider>
-          <AppStateProvider>
+      <AuthProvider>
+        <AppStateProvider>
+          <ThemeProvider>
             <ResetFlowProvider>
               <Root />
             </ResetFlowProvider>
-          </AppStateProvider>
-        </AuthProvider>
-      </ThemeProvider>
+          </ThemeProvider>
+        </AppStateProvider>
+      </AuthProvider>
     </SafeAreaProvider>
   );
 }
 
 function Root() {
   const [splashDone, setSplashDone] = useState(false);
-  useReminderSync(); // keep personalised daily reminders scheduled + fresh
-  useCloudSync(); // mirror resets to the signed-in user's Supabase account
+  useReminderSync(); // local daily reminders (fallback / offline) scheduled + fresh
+  usePushRegistration(); // register the device's Expo push token for server push
   return (
     <>
       <RootNavigator />

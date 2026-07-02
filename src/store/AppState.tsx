@@ -1,55 +1,70 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { supabase, supabaseEnabled } from '../supabase/client';
+import { useAuth } from '../supabase/auth';
 
 /**
- * App state — local-only (AsyncStorage), no account, no network (MVP).
- * Simplified model: the daily action is a "Reset" anchored on a concrete
- * situation. No Easy/Full modes, no pulls/virtues. Display/comfort prefs live
- * in ThemeContext.
+ * App state — DB is the source of truth. Everything (profile, preferences,
+ * resets, lessons watched) is stored in Supabase against the user id and loaded
+ * on sign-in. No app data lives on the device; only the Supabase auth session
+ * is persisted locally (that's how auth works). Mutations write through to the
+ * DB and update in-memory state.
  */
 
-const STORAGE_KEY = '@trueshift/app';
-
 export type Outcome = 'done' | 'notyet';
+export type TextSizeName = 'Normal' | 'Large' | 'Largest';
 
 export interface ResetRecord {
-  id: string;
-  /** ISO timestamp */
-  date: string;
-  /** optional 1–5 "how heavy did it feel" */
+  id: string; // == client_id
+  date: string; // ISO
   heaviness?: number;
-  /** optional one-tap emotion label (affect labeling) */
   emotion?: string;
   situationId?: string;
   customSituation?: string;
-  /** optional free note ("add the thought") */
   note?: string;
   reframe?: string;
   actionText?: string;
-  /** AI thought tags + thinking-pattern, for the Insights map */
   keywords?: string[];
   distortion?: string;
   outcome?: Outcome;
 }
 
+export interface DisplayPrefs {
+  theme: string;
+  textSize: TextSizeName;
+  reduceMotion: boolean;
+  readAloud: boolean;
+}
+
 interface AppData {
-  onboardingComplete: boolean;
   name: string;
-  resets: ResetRecord[];
-  lessonsWatched: string[];
+  dob?: string;
+  onboardingComplete: boolean;
   reminderEnabled: boolean;
-  reminderHour: number; // 0–23
-  reminderMinute: number; // 0–59
+  reminderHour: number;
+  reminderMinute: number;
+  expoPushToken?: string;
+  theme: string;
+  textSize: TextSizeName;
+  reduceMotion: boolean;
+  readAloud: boolean;
+  lessonsWatched: string[];
+  resets: ResetRecord[];
 }
 
 const DEFAULTS: AppData = {
-  onboardingComplete: false,
   name: 'there',
-  resets: [],
-  lessonsWatched: [],
+  dob: undefined,
+  onboardingComplete: false,
   reminderEnabled: false,
   reminderHour: 20,
   reminderMinute: 0,
+  expoPushToken: undefined,
+  theme: 'calmDark',
+  textSize: 'Normal',
+  reduceMotion: false,
+  readAloud: false,
+  lessonsWatched: [],
+  resets: [],
 };
 
 export interface Stats {
@@ -57,18 +72,21 @@ export interface Stats {
   totalResets: number;
   actionsDone: number;
   mostCommonSituationId: string | null;
-  weekly: { label: string; value: number }[]; // last 7 days, 0..1 normalized
+  weekly: { label: string; value: number }[];
 }
 
 interface AppStateValue extends AppData {
   hydrated: boolean;
+  signedIn: boolean;
   completeOnboarding: () => void;
   setName: (name: string) => void;
   setReminder: (prefs: { enabled?: boolean; hour?: number; minute?: number }) => void;
-  recordReset: (reset: Omit<ResetRecord, 'id' | 'date'>) => void;
-  mergeRemoteResets: (records: ResetRecord[]) => void;
+  setDisplayPref: (prefs: Partial<DisplayPrefs>) => void;
+  setExpoPushToken: (token: string) => void;
+  recordReset: (reset: Omit<ResetRecord, 'id' | 'date'>) => Promise<void>;
   markLessonWatched: (id: string) => void;
   deleteAllData: () => Promise<void>;
+  reload: () => Promise<void>;
   stats: Stats;
 }
 
@@ -78,20 +96,52 @@ function dayKey(d: Date): string {
   return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
 }
 
+function rowToReset(row: any): ResetRecord {
+  return {
+    id: row.client_id || row.id,
+    date: row.occurred_at || row.created_at,
+    heaviness: row.heaviness ?? undefined,
+    emotion: row.emotion ?? undefined,
+    situationId: row.situation_id ?? undefined,
+    customSituation: row.custom_situation ?? undefined,
+    note: row.note ?? undefined,
+    reframe: row.reframe ?? undefined,
+    actionText: row.action_text ?? undefined,
+    keywords: Array.isArray(row.keywords) ? row.keywords : undefined,
+    distortion: row.distortion ?? undefined,
+    outcome: row.outcome ?? undefined,
+  };
+}
+
+function profileToPrefs(p: any): Partial<AppData> {
+  if (!p) return {};
+  return {
+    name: p.name || 'there',
+    dob: p.dob ?? undefined,
+    onboardingComplete: !!p.onboarding_complete,
+    reminderEnabled: !!p.reminder_enabled,
+    reminderHour: typeof p.reminder_hour === 'number' ? p.reminder_hour : 20,
+    reminderMinute: typeof p.reminder_minute === 'number' ? p.reminder_minute : 0,
+    expoPushToken: p.expo_push_token ?? undefined,
+    theme: p.theme || 'calmDark',
+    textSize: (p.text_size as TextSizeName) || 'Normal',
+    reduceMotion: !!p.reduce_motion,
+    readAloud: !!p.read_aloud,
+    lessonsWatched: Array.isArray(p.lessons_watched) ? p.lessons_watched : [],
+  };
+}
+
 function computeStats(resets: ResetRecord[]): Stats {
   const totalResets = resets.length;
   const actionsDone = resets.filter((r) => r.outcome === 'done').length;
-
-  // streak: consecutive days (ending today or yesterday) with ≥1 reset
   const days = new Set(resets.map((r) => dayKey(new Date(r.date))));
   let currentStreak = 0;
   const cursor = new Date();
-  if (!days.has(dayKey(cursor))) cursor.setDate(cursor.getDate() - 1); // 1-day grace
+  if (!days.has(dayKey(cursor))) cursor.setDate(cursor.getDate() - 1);
   while (days.has(dayKey(cursor))) {
     currentStreak += 1;
     cursor.setDate(cursor.getDate() - 1);
   }
-
   const counts: Record<string, number> = {};
   resets.forEach((r) => {
     if (r.situationId) counts[r.situationId] = (counts[r.situationId] || 0) + 1;
@@ -104,7 +154,6 @@ function computeStats(resets: ResetRecord[]): Stats {
       mostCommonSituationId = k;
     }
   });
-
   const labels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const buckets: { label: string; count: number }[] = [];
   for (let i = 6; i >= 0; i--) {
@@ -115,91 +164,163 @@ function computeStats(resets: ResetRecord[]): Stats {
   }
   const max = Math.max(1, ...buckets.map((b) => b.count));
   const weekly = buckets.map((b) => ({ label: b.label, value: b.count / max }));
-
   return { currentStreak, totalResets, actionsDone, mostCommonSituationId, weekly };
 }
 
+let idSeq = 0;
+function newClientId(): string {
+  idSeq += 1;
+  return `${Date.now()}-${idSeq}-${Math.round(Math.random() * 1e6)}`;
+}
+
 export function AppStateProvider({ children }: { children: React.ReactNode }) {
+  const { session, ready: authReady } = useAuth();
+  const uid = session?.user?.id ?? null;
   const [data, setData] = useState<AppData>(DEFAULTS);
   const [hydrated, setHydrated] = useState(false);
+  const dataRef = useRef(data);
+  dataRef.current = data;
 
+  const load = useCallback(async () => {
+    if (!supabase || !uid) {
+      setData(DEFAULTS);
+      setHydrated(true);
+      return;
+    }
+    try {
+      const [{ data: profile }, { data: resetRows }] = await Promise.all([
+        supabase.from('profiles').select('*').eq('id', uid).single(),
+        supabase.from('resets').select('*').eq('user_id', uid).order('occurred_at', { ascending: false }),
+      ]);
+      const resets = Array.isArray(resetRows) ? resetRows.map(rowToReset) : [];
+      setData({ ...DEFAULTS, ...profileToPrefs(profile), resets });
+    } catch {
+      setData(DEFAULTS);
+    } finally {
+      setHydrated(true);
+    }
+  }, [uid]);
+
+  // (re)load whenever the signed-in user changes
   useEffect(() => {
-    (async () => {
-      try {
-        const raw = await AsyncStorage.getItem(STORAGE_KEY);
-        if (raw) setData({ ...DEFAULTS, ...JSON.parse(raw) });
-      } catch {
-        // ignore — fall back to defaults
-      } finally {
-        setHydrated(true);
+    if (!authReady) return;
+    setHydrated(false);
+    load();
+  }, [authReady, uid, load]);
+
+  // patch the profile row in DB + local state
+  const patchProfile = useCallback(
+    (patch: Record<string, any>, local: Partial<AppData>) => {
+      setData((d) => ({ ...d, ...local }));
+      if (supabase && uid) {
+        supabase
+          .from('profiles')
+          .update({ ...patch, updated_at: new Date().toISOString() })
+          .eq('id', uid)
+          .then(() => {}, () => {});
       }
-    })();
-  }, []);
+    },
+    [uid]
+  );
 
-  const persist = useCallback((next: AppData) => {
-    setData(next);
-    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next)).catch(() => {});
-  }, []);
+  const completeOnboarding = useCallback(() => patchProfile({ onboarding_complete: true }, { onboardingComplete: true }), [patchProfile]);
+  const setName = useCallback((name: string) => patchProfile({ name }, { name }), [patchProfile]);
+  const setExpoPushToken = useCallback((token: string) => patchProfile({ expo_push_token: token }, { expoPushToken: token }), [patchProfile]);
 
-  const completeOnboarding = useCallback(() => persist({ ...data, onboardingComplete: true }), [persist, data]);
-  const setName = useCallback((name: string) => persist({ ...data, name }), [persist, data]);
   const setReminder = useCallback(
-    (prefs: { enabled?: boolean; hour?: number; minute?: number }) =>
-      persist({
-        ...data,
-        reminderEnabled: prefs.enabled ?? data.reminderEnabled,
-        reminderHour: prefs.hour ?? data.reminderHour,
-        reminderMinute: prefs.minute ?? data.reminderMinute,
-      }),
-    [persist, data]
+    (prefs: { enabled?: boolean; hour?: number; minute?: number }) => {
+      const patch: Record<string, any> = {};
+      const local: Partial<AppData> = {};
+      if (prefs.enabled !== undefined) { patch.reminder_enabled = prefs.enabled; local.reminderEnabled = prefs.enabled; }
+      if (prefs.hour !== undefined) { patch.reminder_hour = prefs.hour; local.reminderHour = prefs.hour; }
+      if (prefs.minute !== undefined) { patch.reminder_minute = prefs.minute; local.reminderMinute = prefs.minute; }
+      patchProfile(patch, local);
+    },
+    [patchProfile]
+  );
+
+  const setDisplayPref = useCallback(
+    (prefs: Partial<DisplayPrefs>) => {
+      const patch: Record<string, any> = {};
+      const local: Partial<AppData> = {};
+      if (prefs.theme !== undefined) { patch.theme = prefs.theme; local.theme = prefs.theme; }
+      if (prefs.textSize !== undefined) { patch.text_size = prefs.textSize; local.textSize = prefs.textSize; }
+      if (prefs.reduceMotion !== undefined) { patch.reduce_motion = prefs.reduceMotion; local.reduceMotion = prefs.reduceMotion; }
+      if (prefs.readAloud !== undefined) { patch.read_aloud = prefs.readAloud; local.readAloud = prefs.readAloud; }
+      patchProfile(patch, local);
+    },
+    [patchProfile]
   );
 
   const recordReset = useCallback(
-    (reset: Omit<ResetRecord, 'id' | 'date'>) => {
-      const record: ResetRecord = {
-        ...reset,
-        id: `${Date.now()}-${Math.round(Math.random() * 1e6)}`,
-        date: new Date().toISOString(),
-      };
-      persist({ ...data, resets: [record, ...data.resets] });
+    async (reset: Omit<ResetRecord, 'id' | 'date'>) => {
+      const record: ResetRecord = { ...reset, id: newClientId(), date: new Date().toISOString() };
+      setData((d) => ({ ...d, resets: [record, ...d.resets] }));
+      if (supabase && uid) {
+        await supabase.from('resets').insert({
+          user_id: uid,
+          client_id: record.id,
+          occurred_at: record.date,
+          heaviness: record.heaviness ?? null,
+          emotion: record.emotion ?? null,
+          situation_id: record.situationId ?? null,
+          custom_situation: record.customSituation ?? null,
+          note: record.note ?? null,
+          reframe: record.reframe ?? null,
+          action_text: record.actionText ?? null,
+          keywords: record.keywords ?? null,
+          distortion: record.distortion ?? null,
+          outcome: record.outcome ?? null,
+        }).then(() => {}, () => {});
+      }
     },
-    [persist, data]
-  );
-
-  // Merge cloud resets into local: add any whose id we don't already have,
-  // then keep newest-first. Used by cloud sync after sign-in.
-  const mergeRemoteResets = useCallback(
-    (records: ResetRecord[]) => {
-      if (!records.length) return;
-      const have = new Set(data.resets.map((r) => r.id));
-      const incoming = records.filter((r) => r.id && !have.has(r.id));
-      if (!incoming.length) return;
-      const merged = [...data.resets, ...incoming].sort(
-        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-      );
-      persist({ ...data, resets: merged });
-    },
-    [persist, data]
+    [uid]
   );
 
   const markLessonWatched = useCallback(
     (id: string) => {
-      if (data.lessonsWatched.includes(id)) return;
-      persist({ ...data, lessonsWatched: [...data.lessonsWatched, id] });
+      if (dataRef.current.lessonsWatched.includes(id)) return;
+      const next = [...dataRef.current.lessonsWatched, id];
+      patchProfile({ lessons_watched: next }, { lessonsWatched: next });
     },
-    [persist, data]
+    [patchProfile]
   );
 
   const deleteAllData = useCallback(async () => {
+    if (supabase && uid) {
+      await supabase.from('resets').delete().eq('user_id', uid).then(() => {}, () => {});
+      await supabase
+        .from('profiles')
+        .update({
+          onboarding_complete: false, reminder_enabled: false, reminder_hour: 20, reminder_minute: 0,
+          theme: 'calmDark', text_size: 'Normal', reduce_motion: false, read_aloud: false,
+          lessons_watched: [], dob: null, expo_push_token: null,
+        })
+        .eq('id', uid)
+        .then(() => {}, () => {});
+    }
     setData(DEFAULTS);
-    await AsyncStorage.removeItem(STORAGE_KEY).catch(() => {});
-  }, []);
+  }, [uid]);
 
   const stats = useMemo(() => computeStats(data.resets), [data.resets]);
 
   const value = useMemo<AppStateValue>(
-    () => ({ ...data, hydrated, completeOnboarding, setName, setReminder, recordReset, mergeRemoteResets, markLessonWatched, deleteAllData, stats }),
-    [data, hydrated, completeOnboarding, setName, setReminder, recordReset, mergeRemoteResets, markLessonWatched, deleteAllData, stats]
+    () => ({
+      ...data,
+      hydrated: hydrated && authReady,
+      signedIn: !!uid,
+      completeOnboarding,
+      setName,
+      setReminder,
+      setDisplayPref,
+      setExpoPushToken,
+      recordReset,
+      markLessonWatched,
+      deleteAllData,
+      reload: load,
+      stats,
+    }),
+    [data, hydrated, authReady, uid, completeOnboarding, setName, setReminder, setDisplayPref, setExpoPushToken, recordReset, markLessonWatched, deleteAllData, load, stats]
   );
 
   return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>;
@@ -210,3 +331,6 @@ export function useApp(): AppStateValue {
   if (!ctx) throw new Error('useApp must be used inside <AppStateProvider>');
   return ctx;
 }
+
+// supabaseEnabled kept importable for callers that branch on config
+export { supabaseEnabled };

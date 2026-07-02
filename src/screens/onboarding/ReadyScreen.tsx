@@ -12,18 +12,15 @@ import { RootStackParamList } from '../../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Ready'>;
 
-export function ReadyScreen({ navigation }: Props) {
+export function ReadyScreen(_: Props) {
   const { theme, tint } = useTheme();
   const { completeOnboarding } = useApp();
   const c = theme.colors;
 
-  const next = () => {
-    completeOnboarding(); // remember prefs are done so returning users skip onboarding
-    navigation.navigate('SignUp');
-  };
-
+  // completing onboarding flips onboarding_complete in the DB → the navigator
+  // swaps to the main app group.
   return (
-    <Screen glow="teal" center bottom={<Button label="Create your account" onPress={next} />}>
+    <Screen glow="teal" center bottom={<Button label="Let's begin" onPress={completeOnboarding} />}>
       <View style={{ alignItems: 'center', gap: spacing.lg }}>
         <View style={{ width: 120, height: 120, borderRadius: radius.full, backgroundColor: tint(c.teal, 0.12), borderWidth: 1.5, borderColor: tint(c.teal, 0.5), alignItems: 'center', justifyContent: 'center', marginBottom: spacing.lg }}>
           <Icon name="check" color={c.teal} size={50} strokeWidth={2.2} />

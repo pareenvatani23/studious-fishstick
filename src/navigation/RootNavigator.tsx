@@ -42,17 +42,16 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 export function RootNavigator() {
   const themeCtx = useTheme();
   const { theme } = themeCtx;
-  const { onboardingComplete, hydrated } = useApp();
+  const { onboardingComplete, hydrated, signedIn } = useApp();
   const { session, ready: authReady, configured } = useAuth();
 
-  // When Supabase is configured we REQUIRE sign-in; otherwise fall back to
-  // local-only mode so the app still runs without accounts.
-  const showApp = configured ? !!session : true;
-  const initialRouteName: keyof RootStackParamList = showApp
-    ? 'Main'
-    : onboardingComplete
-    ? 'SignIn'
-    : 'Welcome';
+  // Three states: auth (must sign in) → onboarding (per-user, in DB) → app.
+  // Without Supabase configured, fall back to app so the app still runs.
+  const needsAuth = configured && !session;
+  const needsOnboarding = !needsAuth && signedIn && !onboardingComplete;
+  const stage: 'auth' | 'onboarding' | 'app' = needsAuth ? 'auth' : needsOnboarding ? 'onboarding' : 'app';
+  const initialRouteName: keyof RootStackParamList =
+    stage === 'auth' ? 'Welcome' : stage === 'onboarding' ? 'HowItWorks' : 'Main';
 
   const navTheme: NavTheme = {
     ...DefaultTheme,
@@ -80,17 +79,20 @@ export function RootNavigator() {
     <NavigationContainer theme={navTheme}>
       <StatusBar style={theme.isDark ? 'light' : 'dark'} />
       <Stack.Navigator initialRouteName={initialRouteName} screenOptions={{ headerShown: false, contentStyle: { backgroundColor: theme.colors.background } }}>
-        {!showApp ? (
+        {stage === 'auth' ? (
           <Stack.Group>
             <Stack.Screen name="Welcome" component={WelcomeScreen} />
+            <Stack.Screen name="SignIn" component={SignInScreen} />
+            <Stack.Screen name="SignUp" component={SignUpScreen} />
+          </Stack.Group>
+        ) : stage === 'onboarding' ? (
+          <Stack.Group>
             <Stack.Screen name="HowItWorks" component={HowItWorksScreen} />
             <Stack.Screen name="TextSize" component={TextSizeScreen} />
             <Stack.Screen name="ReadAloud" component={ReadAloudScreen} />
             <Stack.Screen name="Privacy" component={PrivacyScreen} />
             <Stack.Screen name="Reminders" component={RemindersScreen} />
             <Stack.Screen name="Ready" component={ReadyScreen} />
-            <Stack.Screen name="SignIn" component={SignInScreen} />
-            <Stack.Screen name="SignUp" component={SignUpScreen} />
           </Stack.Group>
         ) : (
           <Stack.Group>

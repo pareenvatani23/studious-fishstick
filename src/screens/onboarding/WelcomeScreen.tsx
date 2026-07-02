@@ -22,8 +22,9 @@ export function WelcomeScreen({ navigation }: Props) {
       glow="teal"
       center
       bottom={
-        <View style={{ gap: spacing.lg }}>
-          <Button label="Start" onPress={() => navigation.navigate('HowItWorks')} />
+        <View style={{ gap: spacing.md }}>
+          <Button label="Get started" onPress={() => navigation.navigate('SignUp')} />
+          <Button label="I already have an account" variant="text" onPress={() => navigation.navigate('SignIn')} />
           <ReadAloudInline text={READ} />
         </View>
       }
