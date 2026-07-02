@@ -7,22 +7,31 @@ import { VideoLessonCard } from '../../components/VideoLessonCard';
 import { SectionLabel } from '../../components/Settings';
 import { useTheme } from '../../theme/ThemeContext';
 import { useRootNav } from '../../navigation/hooks';
-import { lessons, exploreSections } from '../../data/lessons';
+import { useLessons } from '../../store/Lessons';
 import { radius, spacing, sizing } from '../../theme/tokens';
 
-/** Explore Library — a finite CBT reading library. Cards, never a feed. */
+/** Explore Library — a finite CBT reading library, AI-sorted for the user. */
 export function ExploreScreen() {
   const { theme } = useTheme();
   const nav = useRootNav();
   const c = theme.colors;
-  const startHere = lessons.find((l) => l.startHere);
+  const { ranked, newCount } = useLessons();
+
+  const startHere = ranked.find((l) => l.startHere);
+  const forYou = ranked.filter((l) => !l.startHere);
 
   return (
     <Screen scroll contentStyle={{ paddingBottom: sizing.tabBar + spacing.xl }}>
       <AppText size={28} weight="700" style={{ marginTop: spacing.sm }}>Explore</AppText>
       <AppText size={14} color={c.text2} style={{ marginTop: spacing.xs }}>
-        Short, practical CBT lessons. Read, listen, then try it.
+        Short, practical CBT lessons — ordered for you. Read, listen, then try it.
       </AppText>
+
+      {newCount > 0 && (
+        <View style={{ marginTop: spacing.md, backgroundColor: c.card, borderWidth: c.borderWidth, borderColor: c.border, borderRadius: radius.md, paddingVertical: spacing.sm, paddingHorizontal: spacing.md }}>
+          <AppText size={13} color={c.teal}>{newCount} new lesson{newCount > 1 ? 's' : ''} added</AppText>
+        </View>
+      )}
 
       {startHere && (
         <>
@@ -42,20 +51,12 @@ export function ExploreScreen() {
         </>
       )}
 
-      {exploreSections.map((section) => {
-        const items = lessons.filter((l) => l.category === section.category && !l.startHere);
-        if (items.length === 0) return null;
-        return (
-          <View key={section.title}>
-            <SectionLabel style={{ marginTop: spacing.xl }}>{section.title}</SectionLabel>
-            <View style={{ gap: spacing.md, marginTop: spacing.md }}>
-              {items.map((lesson) => (
-                <VideoLessonCard key={lesson.id} lesson={lesson} onPress={() => nav.navigate('VideoLesson', { lessonId: lesson.id })} />
-              ))}
-            </View>
-          </View>
-        );
-      })}
+      <SectionLabel style={{ marginTop: spacing.xl }}>For you</SectionLabel>
+      <View style={{ gap: spacing.md, marginTop: spacing.md }}>
+        {forYou.map((lesson) => (
+          <VideoLessonCard key={lesson.id} lesson={lesson} onPress={() => nav.navigate('VideoLesson', { lessonId: lesson.id })} />
+        ))}
+      </View>
     </Screen>
   );
 }

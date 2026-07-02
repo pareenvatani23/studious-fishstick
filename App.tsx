@@ -5,6 +5,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ThemeProvider } from './src/theme/ThemeContext';
 import { AppStateProvider } from './src/store/AppState';
 import { ResetFlowProvider } from './src/store/ResetFlow';
+import { LessonsProvider } from './src/store/Lessons';
 import { AuthProvider } from './src/supabase/auth';
 import { RootNavigator } from './src/navigation/RootNavigator';
 import { AnimatedSplash } from './src/components/AnimatedSplash';
@@ -55,9 +56,11 @@ export default function App() {
       <AuthProvider>
         <AppStateProvider>
           <ThemeProvider>
-            <ResetFlowProvider>
-              <Root />
-            </ResetFlowProvider>
+            <LessonsProvider>
+              <ResetFlowProvider>
+                <Root />
+              </ResetFlowProvider>
+            </LessonsProvider>
           </ThemeProvider>
         </AppStateProvider>
       </AuthProvider>

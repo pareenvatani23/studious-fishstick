@@ -13,7 +13,7 @@ import { useTheme } from '../../theme/ThemeContext';
 import { useApp } from '../../store/AppState';
 import { useResetFlow } from '../../store/ResetFlow';
 import { useRootNav } from '../../navigation/hooks';
-import { lessonById } from '../../data/lessons';
+import { useLessons } from '../../store/Lessons';
 import { voiceEnabled } from '../../ai/config';
 import { synthesize } from '../../ai/elevenlabs';
 import { radius, spacing, sizing } from '../../theme/tokens';
@@ -32,7 +32,8 @@ export function VideoLessonScreen({ route }: Props) {
   const { start } = useResetFlow();
   const nav = useRootNav();
   const c = theme.colors;
-  const lesson = lessonById(route.params.lessonId);
+  const { getById } = useLessons();
+  const lesson = getById(route.params.lessonId);
 
   const [audio, setAudio] = useState<'idle' | 'preparing' | 'playing' | 'paused'>('idle');
   const soundRef = useRef<Audio.Sound | null>(null);

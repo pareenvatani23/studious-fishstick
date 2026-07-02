@@ -39,6 +39,33 @@ export async function invokeAI<T = any>(action: AIAction, input: unknown): Promi
   }
 }
 
+/** Ask the `rank-lessons` function to order lessons for this user. Falls back to input order. */
+export async function rankLessons(
+  history: unknown,
+  lessons: { id: string; title: string; category: string; summary?: string }[]
+): Promise<string[]> {
+  const fallback = lessons.map((l) => l.id);
+  const token = await accessToken();
+  if (!token) return fallback;
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), AI_TIMEOUT_MS);
+  try {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/rank-lessons`, {
+      method: 'POST',
+      signal: ctrl.signal,
+      headers: { 'Content-Type': 'application/json', apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ history, lessons }),
+    });
+    if (!res.ok) return fallback;
+    const data = await res.json();
+    return Array.isArray(data?.order) && data.order.length ? data.order : fallback;
+  } catch {
+    return fallback;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /** Call the `tts` edge function and return raw mp3 bytes. Throws on failure. */
 export async function invokeTTS(text: string): Promise<ArrayBuffer> {
   const token = await accessToken();
