@@ -18,7 +18,7 @@ export function PrivacyScreen({ navigation }: Props) {
   const c = theme.colors;
 
   return (
-    <Screen scroll bottom={<Button label="I understand" onPress={() => navigation.navigate('Ready')} />}>
+    <Screen scroll bottom={<Button label="I understand" onPress={() => navigation.navigate('Reminders')} />}>
       <View style={{ width: 56, height: 56, borderRadius: radius.lg, backgroundColor: tint(c.teal, 0.13), borderWidth: c.borderWidth, borderColor: tint(c.teal, 0.4), alignItems: 'center', justifyContent: 'center', marginBottom: spacing.xl, marginTop: spacing.sm }}>
         <Icon name="shieldCheck" color={c.teal} size={28} />
       </View>

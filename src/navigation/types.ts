@@ -15,6 +15,7 @@ export type RootStackParamList = {
   TextSize: undefined;
   ReadAloud: undefined;
   Privacy: undefined;
+  Reminders: undefined;
   Ready: undefined;
 
   // App shell
@@ -29,6 +30,7 @@ export type RootStackParamList = {
   VideoLesson: { lessonId: string };
   HowToUse: undefined;
   ThemePicker: undefined;
+  ReminderSettings: undefined;
   CrisisResources: undefined;
   Info: { kind: 'about' | 'terms' | 'privacy' };
   DeleteData: undefined;

@@ -37,6 +37,9 @@ interface AppData {
   name: string;
   resets: ResetRecord[];
   lessonsWatched: string[];
+  reminderEnabled: boolean;
+  reminderHour: number; // 0–23
+  reminderMinute: number; // 0–59
 }
 
 const DEFAULTS: AppData = {
@@ -44,6 +47,9 @@ const DEFAULTS: AppData = {
   name: 'there',
   resets: [],
   lessonsWatched: [],
+  reminderEnabled: false,
+  reminderHour: 20,
+  reminderMinute: 0,
 };
 
 export interface Stats {
@@ -58,6 +64,7 @@ interface AppStateValue extends AppData {
   hydrated: boolean;
   completeOnboarding: () => void;
   setName: (name: string) => void;
+  setReminder: (prefs: { enabled?: boolean; hour?: number; minute?: number }) => void;
   recordReset: (reset: Omit<ResetRecord, 'id' | 'date'>) => void;
   markLessonWatched: (id: string) => void;
   deleteAllData: () => Promise<void>;
@@ -135,6 +142,16 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
 
   const completeOnboarding = useCallback(() => persist({ ...data, onboardingComplete: true }), [persist, data]);
   const setName = useCallback((name: string) => persist({ ...data, name }), [persist, data]);
+  const setReminder = useCallback(
+    (prefs: { enabled?: boolean; hour?: number; minute?: number }) =>
+      persist({
+        ...data,
+        reminderEnabled: prefs.enabled ?? data.reminderEnabled,
+        reminderHour: prefs.hour ?? data.reminderHour,
+        reminderMinute: prefs.minute ?? data.reminderMinute,
+      }),
+    [persist, data]
+  );
 
   const recordReset = useCallback(
     (reset: Omit<ResetRecord, 'id' | 'date'>) => {
@@ -164,8 +181,8 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   const stats = useMemo(() => computeStats(data.resets), [data.resets]);
 
   const value = useMemo<AppStateValue>(
-    () => ({ ...data, hydrated, completeOnboarding, setName, recordReset, markLessonWatched, deleteAllData, stats }),
-    [data, hydrated, completeOnboarding, setName, recordReset, markLessonWatched, deleteAllData, stats]
+    () => ({ ...data, hydrated, completeOnboarding, setName, setReminder, recordReset, markLessonWatched, deleteAllData, stats }),
+    [data, hydrated, completeOnboarding, setName, setReminder, recordReset, markLessonWatched, deleteAllData, stats]
   );
 
   return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>;

@@ -7,6 +7,7 @@ import { AppStateProvider } from './src/store/AppState';
 import { ResetFlowProvider } from './src/store/ResetFlow';
 import { RootNavigator } from './src/navigation/RootNavigator';
 import { AnimatedSplash } from './src/components/AnimatedSplash';
+import { useReminderSync } from './src/notifications/useReminderSync';
 
 /**
  * TrueShift — your daily reset for a steadier mind.
@@ -62,6 +63,7 @@ export default function App() {
 
 function Root() {
   const [splashDone, setSplashDone] = useState(false);
+  useReminderSync(); // keep personalised daily reminders scheduled + fresh
   return (
     <>
       <RootNavigator />

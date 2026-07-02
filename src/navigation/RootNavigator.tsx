@@ -14,6 +14,7 @@ import { HowItWorksScreen } from '../screens/onboarding/HowItWorksScreen';
 import { TextSizeScreen } from '../screens/onboarding/TextSizeScreen';
 import { ReadAloudScreen } from '../screens/onboarding/ReadAloudScreen';
 import { PrivacyScreen } from '../screens/onboarding/PrivacyScreen';
+import { RemindersScreen } from '../screens/onboarding/RemindersScreen';
 import { ReadyScreen } from '../screens/onboarding/ReadyScreen';
 
 // Reset loop
@@ -25,6 +26,7 @@ import { DoneScreen } from '../screens/reset/DoneScreen';
 import { VideoLessonScreen } from '../screens/explore/VideoLessonScreen';
 import { HowToUseScreen } from '../screens/profile/HowToUseScreen';
 import { ThemePickerScreen } from '../screens/profile/ThemePickerScreen';
+import { ReminderSettingsScreen } from '../screens/profile/ReminderSettingsScreen';
 import { CrisisResourcesScreen } from '../screens/profile/CrisisResourcesScreen';
 import { InfoScreen } from '../screens/profile/InfoScreen';
 import { DeleteDataScreen } from '../screens/profile/DeleteDataScreen';
@@ -69,6 +71,7 @@ export function RootNavigator() {
             <Stack.Screen name="TextSize" component={TextSizeScreen} />
             <Stack.Screen name="ReadAloud" component={ReadAloudScreen} />
             <Stack.Screen name="Privacy" component={PrivacyScreen} />
+            <Stack.Screen name="Reminders" component={RemindersScreen} />
             <Stack.Screen name="Ready" component={ReadyScreen} />
           </Stack.Group>
         ) : (
@@ -82,6 +85,7 @@ export function RootNavigator() {
             <Stack.Screen name="VideoLesson" component={VideoLessonScreen} />
             <Stack.Screen name="HowToUse" component={HowToUseScreen} />
             <Stack.Screen name="ThemePicker" component={ThemePickerScreen} />
+            <Stack.Screen name="ReminderSettings" component={ReminderSettingsScreen} />
             <Stack.Screen name="CrisisResources" component={CrisisResourcesScreen} />
             <Stack.Screen name="Info" component={InfoScreen} />
             <Stack.Screen name="DeleteData" component={DeleteDataScreen} options={{ presentation: 'transparentModal', animation: 'fade' }} />

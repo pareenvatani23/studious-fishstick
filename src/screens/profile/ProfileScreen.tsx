@@ -12,7 +12,7 @@ import { radius, spacing, sizing } from '../../theme/tokens';
 /** Profile / Settings. Calm settings list with clear spacing. No modes. */
 export function ProfileScreen() {
   const { theme } = useTheme();
-  const { name } = useApp();
+  const { name, reminderEnabled } = useApp();
   const nav = useRootNav();
   const c = theme.colors;
 
@@ -31,7 +31,7 @@ export function ProfileScreen() {
       <ListGroup style={{ marginTop: spacing.lg }}>
         <SettingsRow label="How TrueShift works" onPress={() => nav.navigate('HowToUse')} />
         <SettingsRow label="Display & comfort" onPress={() => nav.navigate('ThemePicker')} />
-        <SettingsRow label="Reminder settings" onPress={() => nav.navigate('Info', { kind: 'about' })} />
+        <SettingsRow label="Daily check-in" value={reminderEnabled ? 'On' : 'Off'} onPress={() => nav.navigate('ReminderSettings')} />
         <SettingsRow label="Privacy" onPress={() => nav.navigate('Info', { kind: 'privacy' })} />
         <SettingsRow label="Crisis resources" onPress={() => nav.navigate('CrisisResources')} last />
       </ListGroup>
