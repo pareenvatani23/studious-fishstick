@@ -18,6 +18,10 @@ export type RootStackParamList = {
   Reminders: undefined;
   Ready: undefined;
 
+  // Auth (required sign-in)
+  SignIn: undefined;
+  SignUp: undefined;
+
   // App shell
   Main: NavigatorScreenParams<TabParamList> | undefined;
 

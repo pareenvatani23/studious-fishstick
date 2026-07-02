@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { TextInput, View } from 'react-native';
+import { TextInput, View, type KeyboardTypeOptions, type ReturnKeyTypeOptions } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
 import { AppText } from './AppText';
 import { radius, spacing } from '../theme/tokens';
@@ -15,9 +15,31 @@ interface InputProps {
   onChangeText: (t: string) => void;
   placeholder?: string;
   multiline?: boolean;
+  keyboardType?: KeyboardTypeOptions;
+  secureTextEntry?: boolean;
+  autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
+  autoComplete?: any;
+  textContentType?: any;
+  returnKeyType?: ReturnKeyTypeOptions;
+  onSubmitEditing?: () => void;
+  maxLength?: number;
 }
 
-export function Input({ label, value, onChangeText, placeholder, multiline = true }: InputProps) {
+export function Input({
+  label,
+  value,
+  onChangeText,
+  placeholder,
+  multiline = true,
+  keyboardType,
+  secureTextEntry,
+  autoCapitalize,
+  autoComplete,
+  textContentType,
+  returnKeyType,
+  onSubmitEditing,
+  maxLength,
+}: InputProps) {
   const { theme, scale } = useTheme();
   const c = theme.colors;
   const [focused, setFocused] = useState(false);
@@ -43,6 +65,14 @@ export function Input({ label, value, onChangeText, placeholder, multiline = tru
         placeholder={placeholder}
         placeholderTextColor={c.muted}
         multiline={multiline}
+        keyboardType={keyboardType}
+        secureTextEntry={secureTextEntry}
+        autoCapitalize={autoCapitalize}
+        autoComplete={autoComplete}
+        textContentType={textContentType}
+        returnKeyType={returnKeyType}
+        onSubmitEditing={onSubmitEditing}
+        maxLength={maxLength}
         allowFontScaling
         accessibilityLabel={label}
         style={{

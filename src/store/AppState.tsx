@@ -66,6 +66,7 @@ interface AppStateValue extends AppData {
   setName: (name: string) => void;
   setReminder: (prefs: { enabled?: boolean; hour?: number; minute?: number }) => void;
   recordReset: (reset: Omit<ResetRecord, 'id' | 'date'>) => void;
+  mergeRemoteResets: (records: ResetRecord[]) => void;
   markLessonWatched: (id: string) => void;
   deleteAllData: () => Promise<void>;
   stats: Stats;
@@ -165,6 +166,22 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     [persist, data]
   );
 
+  // Merge cloud resets into local: add any whose id we don't already have,
+  // then keep newest-first. Used by cloud sync after sign-in.
+  const mergeRemoteResets = useCallback(
+    (records: ResetRecord[]) => {
+      if (!records.length) return;
+      const have = new Set(data.resets.map((r) => r.id));
+      const incoming = records.filter((r) => r.id && !have.has(r.id));
+      if (!incoming.length) return;
+      const merged = [...data.resets, ...incoming].sort(
+        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+      );
+      persist({ ...data, resets: merged });
+    },
+    [persist, data]
+  );
+
   const markLessonWatched = useCallback(
     (id: string) => {
       if (data.lessonsWatched.includes(id)) return;
@@ -181,8 +198,8 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   const stats = useMemo(() => computeStats(data.resets), [data.resets]);
 
   const value = useMemo<AppStateValue>(
-    () => ({ ...data, hydrated, completeOnboarding, setName, setReminder, recordReset, markLessonWatched, deleteAllData, stats }),
-    [data, hydrated, completeOnboarding, setName, setReminder, recordReset, markLessonWatched, deleteAllData, stats]
+    () => ({ ...data, hydrated, completeOnboarding, setName, setReminder, recordReset, mergeRemoteResets, markLessonWatched, deleteAllData, stats }),
+    [data, hydrated, completeOnboarding, setName, setReminder, recordReset, mergeRemoteResets, markLessonWatched, deleteAllData, stats]
   );
 
   return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>;

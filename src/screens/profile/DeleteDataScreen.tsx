@@ -7,6 +7,8 @@ import { Button } from '../../components/Button';
 import { Icon } from '../../components/icons';
 import { useTheme } from '../../theme/ThemeContext';
 import { useApp } from '../../store/AppState';
+import { useAuth } from '../../supabase/auth';
+import { deleteAllCloud } from '../../supabase/sync';
 import { radius, spacing } from '../../theme/tokens';
 import { RootStackParamList } from '../../navigation/types';
 
@@ -14,18 +16,23 @@ type Props = NativeStackScreenProps<RootStackParamList, 'DeleteData'>;
 
 /**
  * Delete Data Confirmation (design 24). Bottom-sheet over a scrim. Clear but
- * not alarmist. Clears app data AND display prefs; the app returns to onboarding.
+ * not alarmist. Clears cloud + local data and display prefs, then signs out.
  */
 export function DeleteDataScreen({ navigation }: Props) {
   const { theme, tint, resetDisplay } = useTheme();
   const { deleteAllData } = useApp();
+  const { configured, session, signOut } = useAuth();
   const insets = useSafeAreaInsets();
   const c = theme.colors;
 
   const confirmDelete = async () => {
+    if (configured && session) {
+      try { await deleteAllCloud(); } catch {}
+    }
     await deleteAllData();
     await resetDisplay();
-    // onboardingComplete flips false → RootNavigator swaps to the onboarding group.
+    if (configured && session) await signOut();
+    // signing out (or onboardingComplete flipping false) returns to the auth/onboarding group.
   };
 
   return (

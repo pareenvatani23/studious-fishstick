@@ -5,6 +5,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
 import { useTheme } from '../theme/ThemeContext';
 import { useApp } from '../store/AppState';
+import { useAuth } from '../supabase/auth';
 import { RootStackParamList } from './types';
 import { TabNavigator } from './TabNavigator';
 
@@ -16,6 +17,10 @@ import { ReadAloudScreen } from '../screens/onboarding/ReadAloudScreen';
 import { PrivacyScreen } from '../screens/onboarding/PrivacyScreen';
 import { RemindersScreen } from '../screens/onboarding/RemindersScreen';
 import { ReadyScreen } from '../screens/onboarding/ReadyScreen';
+
+// Auth
+import { SignInScreen } from '../screens/auth/SignInScreen';
+import { SignUpScreen } from '../screens/auth/SignUpScreen';
 
 // Reset loop
 import { SituationScreen } from '../screens/reset/SituationScreen';
@@ -37,6 +42,16 @@ export function RootNavigator() {
   const themeCtx = useTheme();
   const { theme } = themeCtx;
   const { onboardingComplete, hydrated } = useApp();
+  const { session, ready: authReady, configured } = useAuth();
+
+  // When Supabase is configured we REQUIRE sign-in; otherwise fall back to
+  // local-only mode so the app still runs without accounts.
+  const showApp = configured ? !!session : true;
+  const initialRouteName: keyof RootStackParamList = showApp
+    ? 'Main'
+    : onboardingComplete
+    ? 'SignIn'
+    : 'Welcome';
 
   const navTheme: NavTheme = {
     ...DefaultTheme,
@@ -52,7 +67,7 @@ export function RootNavigator() {
     },
   };
 
-  if (!hydrated || !themeCtx.hydrated) {
+  if (!hydrated || !themeCtx.hydrated || (configured && !authReady)) {
     return (
       <View style={{ flex: 1, backgroundColor: theme.colors.background, alignItems: 'center', justifyContent: 'center' }}>
         <ActivityIndicator color={theme.colors.teal} />
@@ -63,8 +78,8 @@ export function RootNavigator() {
   return (
     <NavigationContainer theme={navTheme}>
       <StatusBar style={theme.isDark ? 'light' : 'dark'} />
-      <Stack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: theme.colors.background } }}>
-        {!onboardingComplete ? (
+      <Stack.Navigator initialRouteName={initialRouteName} screenOptions={{ headerShown: false, contentStyle: { backgroundColor: theme.colors.background } }}>
+        {!showApp ? (
           <Stack.Group>
             <Stack.Screen name="Welcome" component={WelcomeScreen} />
             <Stack.Screen name="HowItWorks" component={HowItWorksScreen} />
@@ -73,6 +88,8 @@ export function RootNavigator() {
             <Stack.Screen name="Privacy" component={PrivacyScreen} />
             <Stack.Screen name="Reminders" component={RemindersScreen} />
             <Stack.Screen name="Ready" component={ReadyScreen} />
+            <Stack.Screen name="SignIn" component={SignInScreen} />
+            <Stack.Screen name="SignUp" component={SignUpScreen} />
           </Stack.Group>
         ) : (
           <Stack.Group>

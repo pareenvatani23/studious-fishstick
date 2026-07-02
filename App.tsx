@@ -5,9 +5,11 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ThemeProvider } from './src/theme/ThemeContext';
 import { AppStateProvider } from './src/store/AppState';
 import { ResetFlowProvider } from './src/store/ResetFlow';
+import { AuthProvider } from './src/supabase/auth';
 import { RootNavigator } from './src/navigation/RootNavigator';
 import { AnimatedSplash } from './src/components/AnimatedSplash';
 import { useReminderSync } from './src/notifications/useReminderSync';
+import { useCloudSync } from './src/supabase/useCloudSync';
 
 /**
  * TrueShift — your daily reset for a steadier mind.
@@ -51,11 +53,13 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <ThemeProvider>
-        <AppStateProvider>
-          <ResetFlowProvider>
-            <Root />
-          </ResetFlowProvider>
-        </AppStateProvider>
+        <AuthProvider>
+          <AppStateProvider>
+            <ResetFlowProvider>
+              <Root />
+            </ResetFlowProvider>
+          </AppStateProvider>
+        </AuthProvider>
       </ThemeProvider>
     </SafeAreaProvider>
   );
@@ -64,6 +68,7 @@ export default function App() {
 function Root() {
   const [splashDone, setSplashDone] = useState(false);
   useReminderSync(); // keep personalised daily reminders scheduled + fresh
+  useCloudSync(); // mirror resets to the signed-in user's Supabase account
   return (
     <>
       <RootNavigator />
