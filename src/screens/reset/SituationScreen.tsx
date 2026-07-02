@@ -14,7 +14,7 @@ import { useRootNav } from '../../navigation/hooks';
 import { situations, situationById } from '../../data/situations';
 import { emotions } from '../../data/emotions';
 import { aiEnabled } from '../../ai/config';
-import { suggestSituations } from '../../ai/openai';
+import { suggestSituations, suggestEmotions } from '../../ai/openai';
 import { radius, spacing, sizing } from '../../theme/tokens';
 
 /**
@@ -34,17 +34,27 @@ export function SituationScreen() {
   const [heaviness, setHeaviness] = useState<number | undefined>();
   const [emotion, setEmotion] = useState<string | undefined>();
   const [extra, setExtra] = useState<string[]>([]);
+  const [suggestedEmotions, setSuggestedEmotions] = useState<string[]>([]);
   const [customOpen, setCustomOpen] = useState(false);
   const [customText, setCustomText] = useState('');
 
   useEffect(() => {
     if (!aiEnabled) return;
-    const recent = resets
+    const recentSituations = resets
       .map((r) => r.customSituation || situationById(r.situationId ?? '')?.label)
       .filter(Boolean) as string[];
-    suggestSituations(recent, situations.map((s) => s.label)).then(setExtra).catch(() => {});
+    suggestSituations(recentSituations, situations.map((s) => s.label)).then(setExtra).catch(() => {});
+
+    const recentEmotions = resets.map((r) => r.emotion).filter(Boolean) as string[];
+    suggestEmotions(recentEmotions, emotions).then(setSuggestedEmotions).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Preloaded personalised feelings first, then the rest (de-duplicated).
+  const orderedEmotions = [
+    ...suggestedEmotions,
+    ...emotions.filter((e) => !suggestedEmotions.some((s) => s.toLowerCase() === e.toLowerCase())),
+  ];
 
   const back = () => (step > 0 ? setStep(step - 1) : nav.goBack());
 
@@ -120,9 +130,18 @@ export function SituationScreen() {
         <View style={{ marginTop: spacing.xxxl }}>
           <AppText size={28} weight="700" lineHeightMultiple={1.2}>What’s the feeling?</AppText>
           <AppText size={15} color={c.text2} style={{ marginTop: spacing.md }}>Naming it helps it settle. Optional.</AppText>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginTop: spacing.xl }}>
-            {emotions.map((e) => (
-              <Chip key={e} label={e} intent="lavender" selected={emotion === e} onPress={() => setEmotion(emotion === e ? undefined : e)} />
+          {suggestedEmotions.length > 0 && (
+            <AppText size={12} weight="600" color={c.muted} uppercase letterSpacing={1} style={{ marginTop: spacing.xl }}>Likely for you</AppText>
+          )}
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginTop: suggestedEmotions.length > 0 ? spacing.md : spacing.xl }}>
+            {orderedEmotions.map((e, i) => (
+              <Chip
+                key={`${e}-${i}`}
+                label={e}
+                intent="lavender"
+                selected={emotion === e}
+                onPress={() => setEmotion(emotion === e ? undefined : e)}
+              />
             ))}
           </View>
         </View>

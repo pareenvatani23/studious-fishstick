@@ -28,6 +28,7 @@ import { NarrationScreen } from '../screens/reset/NarrationScreen';
 import { DoneScreen } from '../screens/reset/DoneScreen';
 
 // Detail / settings
+import { ResetDetailScreen } from '../screens/progress/ResetDetailScreen';
 import { VideoLessonScreen } from '../screens/explore/VideoLessonScreen';
 import { HowToUseScreen } from '../screens/profile/HowToUseScreen';
 import { ThemePickerScreen } from '../screens/profile/ThemePickerScreen';
@@ -98,6 +99,7 @@ export function RootNavigator() {
             <Stack.Screen name="ResetSituation" component={SituationScreen} />
             <Stack.Screen name="ResetNarration" component={NarrationScreen} />
             <Stack.Screen name="ResetDone" component={DoneScreen} />
+            <Stack.Screen name="ResetDetail" component={ResetDetailScreen} />
             {/* detail / settings */}
             <Stack.Screen name="VideoLesson" component={VideoLessonScreen} />
             <Stack.Screen name="HowToUse" component={HowToUseScreen} />

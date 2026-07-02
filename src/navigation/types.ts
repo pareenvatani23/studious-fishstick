@@ -29,6 +29,7 @@ export type RootStackParamList = {
   ResetSituation: undefined;
   ResetNarration: undefined;
   ResetDone: undefined;
+  ResetDetail: { id: string };
 
   // Detail / settings
   VideoLesson: { lessonId: string };

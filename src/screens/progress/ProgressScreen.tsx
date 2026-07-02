@@ -1,11 +1,12 @@
 import React, { useMemo } from 'react';
-import { View } from 'react-native';
+import { View, Pressable } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Screen, Card } from '../../components/Screen';
 import { AppText } from '../../components/AppText';
 import { Button } from '../../components/Button';
 import { EmptyState } from '../../components/EmptyState';
 import { SectionLabel } from '../../components/Settings';
+import { Icon } from '../../components/icons';
 import { useTheme } from '../../theme/ThemeContext';
 import { useApp } from '../../store/AppState';
 import { useResetFlow } from '../../store/ResetFlow';
@@ -110,8 +111,42 @@ export function ProgressScreen() {
         </Card>
       )}
 
+      {/* Your resets — history */}
+      <View style={{ marginTop: spacing.lg, marginBottom: spacing.sm }}>
+        <SectionLabel>Your resets</SectionLabel>
+      </View>
+      <View style={{ gap: spacing.sm }}>
+        {resets.slice(0, 12).map((r) => {
+          const label = r.customSituation?.trim() || (r.situationId ? situationById(r.situationId)?.label : '') || 'A moment';
+          const when = new Date(r.date).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+          const done = r.outcome === 'done';
+          return (
+            <Pressable
+              key={r.id}
+              onPress={() => nav.navigate('ResetDetail', { id: r.id })}
+              accessibilityRole="button"
+              accessibilityLabel={`${label}, ${when}`}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, backgroundColor: c.card, borderWidth: c.borderWidth, borderColor: c.border, borderRadius: radius.lg, paddingVertical: spacing.md, paddingHorizontal: spacing.lg }}
+            >
+              <View style={{ flex: 1 }}>
+                <AppText size={15} weight="600" numberOfLines={1}>{label}</AppText>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: 2 }}>
+                  <AppText size={12} color={c.muted}>{when}</AppText>
+                  {r.emotion ? <AppText size={12} color={c.lavender}>· {r.emotion}</AppText> : null}
+                  {done ? <AppText size={12} color={c.success}>· step done</AppText> : null}
+                </View>
+              </View>
+              <Icon name="chevronRight" color={c.muted} size={18} />
+            </Pressable>
+          );
+        })}
+        {resets.length > 12 && (
+          <AppText size={12} color={c.muted} style={{ marginTop: spacing.xs }}>Showing your 12 most recent.</AppText>
+        )}
+      </View>
+
       {/* Weekly */}
-      <Card style={{ marginTop: spacing.md }}>
+      <Card style={{ marginTop: spacing.lg }}>
         <SectionLabel>This week</SectionLabel>
         <View style={{ gap: 11, marginTop: spacing.lg }}>
           {stats.weekly.map((d, i) => (
