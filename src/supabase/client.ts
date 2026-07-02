@@ -9,8 +9,8 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
  * with the row-level-security rules in supabase/schema.sql, which scope every
  * row to auth.uid(). Sessions persist in AsyncStorage and auto-refresh.
  */
-const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
-const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
+export const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
+export const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
 
 /** True only when both env values are present — lets the app degrade gracefully. */
 export const supabaseEnabled = SUPABASE_URL.length > 0 && SUPABASE_ANON_KEY.length > 0;

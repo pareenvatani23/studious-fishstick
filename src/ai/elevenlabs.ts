@@ -1,36 +1,14 @@
 import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system';
-import { ELEVENLABS_API_KEY, ELEVENLABS_MODEL, ELEVENLABS_VOICE_ID, AI_TIMEOUT_MS } from './config';
+import { invokeTTS } from './edge';
 
 /**
- * ElevenLabs TTS → a playable URI. On native we write the mp3 to the cache dir;
- * on web we return an object URL. (ElevenLabs avatar VIDEO has no API yet, so
- * this is audio played over the in-app visual.)
+ * Voice narration via the `tts` edge function (ElevenLabs key lives server-side).
+ * Returns a playable URI: on native we write the mp3 to the cache dir; on web we
+ * return an object URL.
  */
 export async function synthesize(text: string): Promise<string> {
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), AI_TIMEOUT_MS);
-  let res: Response;
-  try {
-    res = await fetch(
-      `https://api.elevenlabs.io/v1/text-to-speech/${ELEVENLABS_VOICE_ID}?output_format=mp3_44100_128`,
-      {
-        method: 'POST',
-        signal: ctrl.signal,
-        headers: { 'xi-api-key': ELEVENLABS_API_KEY, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          text,
-          model_id: ELEVENLABS_MODEL,
-          // calm + expressive + steady: moderate stability, high similarity, gentle style
-          voice_settings: { stability: 0.5, similarity_boost: 0.85, style: 0.3, use_speaker_boost: true },
-        }),
-      }
-    );
-  } finally {
-    clearTimeout(timer);
-  }
-  if (!res.ok) throw new Error(`ElevenLabs ${res.status}`);
-  const buf = await res.arrayBuffer();
+  const buf = await invokeTTS(text);
 
   if (Platform.OS === 'web') {
     const blob = new Blob([buf], { type: 'audio/mpeg' });
