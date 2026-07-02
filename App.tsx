@@ -6,6 +6,7 @@ import { ThemeProvider } from './src/theme/ThemeContext';
 import { AppStateProvider } from './src/store/AppState';
 import { ResetFlowProvider } from './src/store/ResetFlow';
 import { RootNavigator } from './src/navigation/RootNavigator';
+import { AnimatedSplash } from './src/components/AnimatedSplash';
 
 /**
  * TrueShift — your daily reset for a steadier mind.
@@ -51,10 +52,20 @@ export default function App() {
       <ThemeProvider>
         <AppStateProvider>
           <ResetFlowProvider>
-            <RootNavigator />
+            <Root />
           </ResetFlowProvider>
         </AppStateProvider>
       </ThemeProvider>
     </SafeAreaProvider>
+  );
+}
+
+function Root() {
+  const [splashDone, setSplashDone] = useState(false);
+  return (
+    <>
+      <RootNavigator />
+      {!splashDone && <AnimatedSplash onDone={() => setSplashDone(true)} />}
+    </>
   );
 }

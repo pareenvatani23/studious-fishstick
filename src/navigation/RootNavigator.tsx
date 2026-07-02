@@ -9,7 +9,6 @@ import { RootStackParamList } from './types';
 import { TabNavigator } from './TabNavigator';
 
 // Onboarding
-import { SplashScreen } from '../screens/onboarding/SplashScreen';
 import { WelcomeScreen } from '../screens/onboarding/WelcomeScreen';
 import { HowItWorksScreen } from '../screens/onboarding/HowItWorksScreen';
 import { TextSizeScreen } from '../screens/onboarding/TextSizeScreen';
@@ -65,7 +64,6 @@ export function RootNavigator() {
       <Stack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: theme.colors.background } }}>
         {!onboardingComplete ? (
           <Stack.Group>
-            <Stack.Screen name="Splash" component={SplashScreen} />
             <Stack.Screen name="Welcome" component={WelcomeScreen} />
             <Stack.Screen name="HowItWorks" component={HowItWorksScreen} />
             <Stack.Screen name="TextSize" component={TextSizeScreen} />

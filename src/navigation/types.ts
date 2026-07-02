@@ -9,8 +9,7 @@ export type TabParamList = {
 };
 
 export type RootStackParamList = {
-  // Onboarding (01–07)
-  Splash: undefined;
+  // Onboarding
   Welcome: undefined;
   HowItWorks: undefined;
   TextSize: undefined;
