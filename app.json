@@ -33,6 +33,7 @@
     },
     "android": {
       "package": "com.trueshift.app",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0E1619"

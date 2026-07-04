@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "88001803941",
+    "project_id": "trueshift-nonprod",
+    "storage_bucket": "trueshift-nonprod.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:88001803941:android:78bd34a97268edac5eff4c",
+        "android_client_info": {
+          "package_name": "com.trueshift.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAByaXJplEGQtBSRoYve5Iho2HRwBdvLww"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
