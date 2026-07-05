@@ -108,30 +108,7 @@ Deno.serve(async (req) => {
     return json({ error: String((e as Error)?.message ?? e) }, 502);
   }
 
-  // Notify opted-in users about the new lesson (deep-links to the lesson).
-  let pushed = 0;
-  try {
-    const pr = await fetch(`${SB_URL}/rest/v1/profiles?select=expo_push_token&reminder_enabled=eq.true&expo_push_token=not.is.null`, {
-      headers: { apikey: SVC, Authorization: `Bearer ${SVC}` },
-    });
-    const profiles = pr.ok ? await pr.json() : [];
-    const messages = (Array.isArray(profiles) ? profiles : []).map((p: any) => ({
-      to: p.expo_push_token,
-      title: 'New lesson for you',
-      body: title,
-      sound: 'default',
-      channelId: 'reminders',
-      data: { type: 'lesson', lessonId: id },
-    }));
-    if (messages.length) {
-      const sendRes = await fetch('https://exp.host/--/api/v2/push/send', {
-        method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(messages),
-      });
-      if (sendRes.ok) pushed = messages.length;
-    }
-  } catch {
-    // push is best-effort
-  }
-
-  return json({ ok: true, id, title, category, pushed });
+  // New lessons reach the app live via Realtime; PUSH notifications for lessons
+  // are governed by the per-user daily planner (daily-nudge), capped at ≤2/day.
+  return json({ ok: true, id, title, category });
 });

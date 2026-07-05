@@ -49,6 +49,8 @@ interface AppData {
   reduceMotion: boolean;
   readAloud: boolean;
   lessonsWatched: string[];
+  /** today's AI notification/consistency plan (server-written), if any */
+  plan?: { toughness?: string; note?: string; sendReset?: boolean; sendLesson?: boolean } | null;
   resets: ResetRecord[];
 }
 
@@ -65,6 +67,7 @@ const DEFAULTS: AppData = {
   reduceMotion: false,
   readAloud: false,
   lessonsWatched: [],
+  plan: null,
   resets: [],
 };
 
@@ -131,6 +134,7 @@ function profileToPrefs(p: any): Partial<AppData> {
     reduceMotion: !!p.reduce_motion,
     readAloud: !!p.read_aloud,
     lessonsWatched: Array.isArray(p.lessons_watched) ? p.lessons_watched : [],
+    plan: p.plan ?? null,
   };
 }
 

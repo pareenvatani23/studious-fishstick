@@ -1,5 +1,5 @@
-import React, { useMemo } from 'react';
-import { View, Pressable } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { View, Pressable, Linking, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Screen, Card } from '../../components/Screen';
 import { AppText } from '../../components/AppText';
@@ -12,23 +12,66 @@ import { useApp } from '../../store/AppState';
 import { useResetFlow } from '../../store/ResetFlow';
 import { useRootNav } from '../../navigation/hooks';
 import { situationById } from '../../data/situations';
+import { listReports, generateReport, reportDownloadUrl, type WeeklyReport } from '../../supabase/reports';
 import { radius, spacing, sizing } from '../../theme/tokens';
 
+/** distinct days with a reset in the last `days` days. */
+function activeDaysIn(resets: { date: string }[], days: number): number {
+  const cutoff = Date.now() - days * 86400000;
+  const set = new Set<string>();
+  resets.forEach((r) => {
+    const t = new Date(r.date).getTime();
+    if (t >= cutoff) { const d = new Date(r.date); set.add(`${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`); }
+  });
+  return set.size;
+}
+
 /**
- * Insights — reflective, not performance pressure. Stats + an AI thought map
- * (keyword frequency) + recurring thinking patterns, built from tracked resets.
+ * Insights — reflective, not performance pressure. A gentle reminder, a
+ * consistency read, stats, an AI thought map, patterns, history, and the
+ * downloadable weekly report.
  */
 export function ProgressScreen() {
   const { theme, tint } = useTheme();
-  const { stats, resets } = useApp();
+  const { stats, resets, lessonsWatched, plan } = useApp();
   const { start } = useResetFlow();
   const nav = useRootNav();
   const c = theme.colors;
+
+  const [reports, setReports] = useState<WeeklyReport[]>([]);
+  const [genBusy, setGenBusy] = useState(false);
+
+  const loadReports = useCallback(() => { listReports().then(setReports).catch(() => {}); }, []);
+  useEffect(() => { loadReports(); }, [loadReports]);
+
+  const onGenerate = async () => {
+    setGenBusy(true);
+    const ok = await generateReport();
+    setGenBusy(false);
+    if (ok) loadReports();
+  };
+
+  const openReport = async (r: WeeklyReport) => {
+    const url = await reportDownloadUrl(r.path);
+    if (url) Linking.openURL(url).catch(() => {});
+  };
 
   const startReset = () => {
     start();
     nav.navigate('ResetSituation');
   };
+
+  // consistency read
+  const todayKey = (() => { const d = new Date(); return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`; })();
+  const resetToday = resets.some((r) => { const d = new Date(r.date); return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}` === todayKey; });
+  const active14 = activeDaysIn(resets, 14);
+  const consistency = active14 >= 8 ? 'Strong' : active14 >= 3 ? 'Building' : 'Getting started';
+  const consistencyNote = plan?.note
+    || (active14 >= 8
+      ? 'You’ve shown up often lately — that regularity is where the change compounds. Keep the rhythm.'
+      : active14 >= 3
+      ? 'You’re building a rhythm. A reset most days and the odd lesson is how it sticks.'
+      : 'Little and often works best — aim for a short reset on most days and a lesson when you can.');
 
   // aggregate AI keywords + distortions
   const { keywordCloud, patterns } = useMemo(() => {
@@ -67,11 +110,69 @@ export function ProgressScreen() {
     <Screen scroll tabBar contentStyle={{ paddingBottom: sizing.tabBar + spacing.xl }} bottom={<Button label="Start a reset" onPress={startReset} />}>
       <AppText size={28} weight="700" style={{ marginTop: spacing.sm }}>Insights</AppText>
 
-      <View style={{ flexDirection: 'row', gap: spacing.md, marginTop: spacing.xl }}>
+      {/* gentle in-app reminder */}
+      {!resetToday && (
+        <Pressable onPress={startReset} accessibilityRole="button" accessibilityLabel="Do today's reset">
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.lg, backgroundColor: tint(c.teal, 0.1), borderWidth: c.borderWidth, borderColor: tint(c.teal, 0.4), borderRadius: radius.lg, padding: spacing.lg }}>
+            <Icon name="bell" color={c.teal} size={20} />
+            <AppText size={14} style={{ flex: 1 }}>You haven’t reset today — a two-minute check-in can steady things.</AppText>
+            <Icon name="chevronRight" color={c.muted} size={18} />
+          </View>
+        </Pressable>
+      )}
+
+      <View style={{ flexDirection: 'row', gap: spacing.md, marginTop: spacing.lg }}>
         <Stat value={String(stats.totalResets)} label="Resets" color={c.teal} />
         <Stat value={String(stats.actionsDone)} label="Steps taken" color={c.success} />
         <Stat value={String(stats.currentStreak)} label="Days in a row" color={c.lavender} />
       </View>
+
+      {/* consistency / staying with the program */}
+      <Card style={{ marginTop: spacing.md }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <SectionLabel>Your consistency</SectionLabel>
+          <View style={{ backgroundColor: tint(c.lavender, 0.14), paddingVertical: 4, paddingHorizontal: 10, borderRadius: radius.full }}>
+            <AppText size={12} weight="700" color={c.lavender}>{consistency}</AppText>
+          </View>
+        </View>
+        <View style={{ flexDirection: 'row', gap: spacing.xl, marginTop: spacing.md }}>
+          <View>
+            <AppText size={22} weight="700" color={c.teal}>{active14}<AppText size={13} color={c.muted}>/14</AppText></AppText>
+            <AppText size={12} color={c.muted}>Active days</AppText>
+          </View>
+          <View>
+            <AppText size={22} weight="700" color={c.lavender}>{lessonsWatched.length}</AppText>
+            <AppText size={12} color={c.muted}>Lessons learned</AppText>
+          </View>
+        </View>
+        <AppText size={14} color={c.text2} lineHeightMultiple={1.5} style={{ marginTop: spacing.md }}>{consistencyNote}</AppText>
+      </Card>
+
+      {/* weekly report — downloadable PDF */}
+      <Card style={{ marginTop: spacing.md }}>
+        <SectionLabel>Weekly report</SectionLabel>
+        <AppText size={14} color={c.text2} lineHeightMultiple={1.45} style={{ marginTop: spacing.sm }}>
+          A graphical summary of your week — thoughts, feelings, patterns and steps — as a PDF you can keep.
+        </AppText>
+        <View style={{ marginTop: spacing.md }}>
+          <Button label={genBusy ? 'Building…' : 'Generate this week’s report'} variant="secondary" disabled={genBusy} onPress={onGenerate} />
+          {genBusy && <ActivityIndicator color={c.teal} style={{ marginTop: spacing.sm }} />}
+        </View>
+        {reports.length > 0 && (
+          <View style={{ marginTop: spacing.md, gap: spacing.sm }}>
+            {reports.slice(0, 8).map((r) => (
+              <Pressable key={r.id} onPress={() => openReport(r)} accessibilityRole="button" accessibilityLabel="Download report"
+                style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.sm }}>
+                <Icon name="lines" color={c.teal} size={18} />
+                <AppText size={14} style={{ flex: 1 }}>
+                  Week of {r.period_end ? new Date(r.period_end).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : '—'}
+                </AppText>
+                <AppText size={13} color={c.teal}>Download</AppText>
+              </Pressable>
+            ))}
+          </View>
+        )}
+      </Card>
 
       {/* Thought map */}
       <Card style={{ marginTop: spacing.md }}>
