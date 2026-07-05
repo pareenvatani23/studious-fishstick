@@ -11,6 +11,7 @@ import { RootNavigator } from './src/navigation/RootNavigator';
 import { AnimatedSplash } from './src/components/AnimatedSplash';
 import { useReminderSync } from './src/notifications/useReminderSync';
 import { usePushRegistration } from './src/notifications/usePushRegistration';
+import { useNotificationRouting } from './src/notifications/useNotificationRouting';
 
 /**
  * TrueShift — your daily reset for a steadier mind.
@@ -72,6 +73,7 @@ function Root() {
   const [splashDone, setSplashDone] = useState(false);
   useReminderSync(); // local daily reminders (fallback / offline) scheduled + fresh
   usePushRegistration(); // register the device's Expo push token for server push
+  useNotificationRouting(); // deep-link notification taps (reset / lesson / insights)
   return (
     <>
       <RootNavigator />

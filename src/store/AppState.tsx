@@ -43,6 +43,7 @@ interface AppData {
   reminderHour: number;
   reminderMinute: number;
   expoPushToken?: string;
+  timezone?: string;
   theme: string;
   textSize: TextSizeName;
   reduceMotion: boolean;
@@ -83,6 +84,7 @@ interface AppStateValue extends AppData {
   setReminder: (prefs: { enabled?: boolean; hour?: number; minute?: number }) => void;
   setDisplayPref: (prefs: Partial<DisplayPrefs>) => void;
   setExpoPushToken: (token: string) => void;
+  setTimezone: (tz: string) => void;
   recordReset: (reset: Omit<ResetRecord, 'id' | 'date'>) => Promise<void>;
   markLessonWatched: (id: string) => void;
   deleteAllData: () => Promise<void>;
@@ -123,6 +125,7 @@ function profileToPrefs(p: any): Partial<AppData> {
     reminderHour: typeof p.reminder_hour === 'number' ? p.reminder_hour : 20,
     reminderMinute: typeof p.reminder_minute === 'number' ? p.reminder_minute : 0,
     expoPushToken: p.expo_push_token ?? undefined,
+    timezone: p.timezone ?? undefined,
     theme: p.theme || 'calmDark',
     textSize: (p.text_size as TextSizeName) || 'Normal',
     reduceMotion: !!p.reduce_motion,
@@ -208,6 +211,20 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     load();
   }, [authReady, uid, load]);
 
+  // keep the user's timezone (IANA) current so server reminders fire at their
+  // real local hour
+  useEffect(() => {
+    if (!hydrated || !uid) return;
+    try {
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      if (tz && tz !== dataRef.current.timezone) {
+        setData((d) => ({ ...d, timezone: tz }));
+        if (supabase) supabase.from('profiles').update({ timezone: tz }).eq('id', uid).then(() => {}, () => {});
+      }
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hydrated, uid]);
+
   // patch the profile row in DB + local state
   const patchProfile = useCallback(
     (patch: Record<string, any>, local: Partial<AppData>) => {
@@ -226,6 +243,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   const completeOnboarding = useCallback(() => patchProfile({ onboarding_complete: true }, { onboardingComplete: true }), [patchProfile]);
   const setName = useCallback((name: string) => patchProfile({ name }, { name }), [patchProfile]);
   const setExpoPushToken = useCallback((token: string) => patchProfile({ expo_push_token: token }, { expoPushToken: token }), [patchProfile]);
+  const setTimezone = useCallback((tz: string) => patchProfile({ timezone: tz }, { timezone: tz }), [patchProfile]);
 
   const setReminder = useCallback(
     (prefs: { enabled?: boolean; hour?: number; minute?: number }) => {
@@ -314,13 +332,14 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       setReminder,
       setDisplayPref,
       setExpoPushToken,
+      setTimezone,
       recordReset,
       markLessonWatched,
       deleteAllData,
       reload: load,
       stats,
     }),
-    [data, hydrated, authReady, uid, completeOnboarding, setName, setReminder, setDisplayPref, setExpoPushToken, recordReset, markLessonWatched, deleteAllData, load, stats]
+    [data, hydrated, authReady, uid, completeOnboarding, setName, setReminder, setDisplayPref, setExpoPushToken, setTimezone, recordReset, markLessonWatched, deleteAllData, load, stats]
   );
 
   return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>;

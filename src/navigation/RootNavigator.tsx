@@ -7,6 +7,7 @@ import { useTheme } from '../theme/ThemeContext';
 import { useApp } from '../store/AppState';
 import { useAuth } from '../supabase/auth';
 import { RootStackParamList } from './types';
+import { navigationRef } from './navigationRef';
 import { TabNavigator } from './TabNavigator';
 
 // Onboarding
@@ -76,7 +77,7 @@ export function RootNavigator() {
   }
 
   return (
-    <NavigationContainer theme={navTheme}>
+    <NavigationContainer ref={navigationRef} theme={navTheme}>
       <StatusBar style={theme.isDark ? 'light' : 'dark'} />
       <Stack.Navigator initialRouteName={initialRouteName} screenOptions={{ headerShown: false, contentStyle: { backgroundColor: theme.colors.background } }}>
         {stage === 'auth' ? (

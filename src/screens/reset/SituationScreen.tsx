@@ -76,10 +76,17 @@ export function SituationScreen() {
       contentStyle={step === 2 ? { paddingBottom: sizing.tabBar + spacing.xl } : undefined}
       bottom={step < 2 ? (
         <View style={{ gap: spacing.sm }}>
-          <Button label="Continue" large onPress={() => setStep(step + 1)} />
-          <Pressable onPress={() => setStep(step + 1)} accessibilityRole="button" accessibilityLabel="Skip" style={{ alignItems: 'center', minHeight: 40, justifyContent: 'center' }}>
-            <AppText size={14} color={c.muted}>Skip</AppText>
-          </Pressable>
+          <Button
+            label="Continue"
+            large
+            disabled={step === 1 && !emotion}
+            onPress={() => setStep(step + 1)}
+          />
+          {step === 0 && (
+            <Pressable onPress={() => setStep(step + 1)} accessibilityRole="button" accessibilityLabel="Skip" style={{ alignItems: 'center', minHeight: 40, justifyContent: 'center' }}>
+              <AppText size={14} color={c.muted}>Skip</AppText>
+            </Pressable>
+          )}
         </View>
       ) : undefined}
     >
@@ -129,7 +136,7 @@ export function SituationScreen() {
       {step === 1 && (
         <View style={{ marginTop: spacing.xxxl }}>
           <AppText size={28} weight="700" lineHeightMultiple={1.2}>What’s the feeling?</AppText>
-          <AppText size={15} color={c.text2} style={{ marginTop: spacing.md }}>Naming it helps it settle. Optional.</AppText>
+          <AppText size={15} color={c.text2} style={{ marginTop: spacing.md }}>Naming it helps it settle. Pick the closest one.</AppText>
           {suggestedEmotions.length > 0 && (
             <AppText size={12} weight="600" color={c.muted} uppercase letterSpacing={1} style={{ marginTop: spacing.xl }}>Likely for you</AppText>
           )}
