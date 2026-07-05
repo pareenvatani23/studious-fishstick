@@ -30,6 +30,9 @@ import { DoneScreen } from '../screens/reset/DoneScreen';
 
 // Detail / settings
 import { ResetDetailScreen } from '../screens/progress/ResetDetailScreen';
+import { BreathingScreen } from '../screens/tools/BreathingScreen';
+import { GroundingScreen } from '../screens/tools/GroundingScreen';
+import { JournalScreen } from '../screens/tools/JournalScreen';
 import { VideoLessonScreen } from '../screens/explore/VideoLessonScreen';
 import { HowToUseScreen } from '../screens/profile/HowToUseScreen';
 import { ThemePickerScreen } from '../screens/profile/ThemePickerScreen';
@@ -103,6 +106,10 @@ export function RootNavigator() {
             <Stack.Screen name="ResetNarration" component={NarrationScreen} />
             <Stack.Screen name="ResetDone" component={DoneScreen} />
             <Stack.Screen name="ResetDetail" component={ResetDetailScreen} />
+            {/* Interactive tools */}
+            <Stack.Screen name="ToolBreathing" component={BreathingScreen} />
+            <Stack.Screen name="ToolGrounding" component={GroundingScreen} />
+            <Stack.Screen name="ToolJournal" component={JournalScreen} />
             {/* detail / settings */}
             <Stack.Screen name="VideoLesson" component={VideoLessonScreen} />
             <Stack.Screen name="HowToUse" component={HowToUseScreen} />

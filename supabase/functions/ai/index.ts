@@ -105,27 +105,48 @@ async function chatJSON(userContent: string, temperature = 0.8, maxTokens = 750)
   }
 }
 
-const crisisResult = () => ({ crisis: true, validate: '', reframe: '', smallStep: '', narration: '', keywords: [], distortion: '' });
+const crisisResult = () => ({ crisis: true, validate: '', reframe: '', smallStep: '', narration: '', keywords: [], distortion: '', tool: 'none', toolVariant: '' });
 
 // ── Actions ──────────────────────────────────────────────────────────────────
 async function generateReset(input: any) {
-  const userText = [input.customSituation, input.note].filter(Boolean).join(' ');
-  if (localCrisisCheck(userText) || localCrisisCheck(input.situationLabel ?? '')) return crisisResult();
+  // Multi-input (with backward-compatible fallbacks to the single fields).
+  const emotions: string[] = Array.isArray(input.emotions) && input.emotions.length ? input.emotions : (input.emotion ? [input.emotion] : []);
+  const situationsList: string[] = Array.isArray(input.situations) && input.situations.length ? input.situations : (input.situationLabel ? [input.situationLabel] : []);
+  const h = input.history ?? {};
+
+  const userText = [input.customSituation, input.note, ...situationsList].filter(Boolean).join(' ');
+  if (localCrisisCheck(userText)) return crisisResult();
   if (userText && (await moderationFlagged(userText))) return crisisResult();
 
   const prompt = [
-    `Situation the user picked: "${input.situationLabel}".`,
+    `The user just logged a moment to work through.`,
+    situationsList.length ? `What happened (one or two things, treat together): ${situationsList.map((s) => `"${s}"`).join(' AND ')}.` : '',
     input.customSituation ? `In their words: "${input.customSituation}".` : '',
-    input.emotion ? `They named the feeling as: "${input.emotion}". Acknowledge this emotion by name in the validation.` : '',
+    emotions.length ? `They named these feelings: ${emotions.join(', ')}. Acknowledge them by name in the validation.` : '',
     input.note ? `The thought underneath: "${input.note}".` : '',
-    input.heaviness ? `They rated how heavy it feels: ${input.heaviness} of 5.` : '',
+    typeof input.heaviness === 'number' ? `They rated how heavy it feels: ${input.heaviness} of 5. Match your tone to that weight.` : '',
+    // Longitudinal "patient history" — use it like a therapist who knows this person; never quote it back verbatim.
+    (h.distortions?.length || h.recentSituations?.length || typeof h.completedSteps === 'number')
+      ? [
+          `BACKGROUND (use like a therapist who knows this person's history; do NOT quote it back or say you have records):`,
+          h.recentSituations?.length ? `- Recurring situations lately: ${JSON.stringify(h.recentSituations.slice(0, 6))}.` : '',
+          h.recentEmotions?.length ? `- Recurring feelings lately: ${JSON.stringify(h.recentEmotions.slice(0, 6))}.` : '',
+          h.distortions?.length ? `- Recurring thinking patterns: ${JSON.stringify(h.distortions.slice(0, 5))}.` : '',
+          typeof h.completedSteps === 'number' && typeof h.suggestedSteps === 'number'
+            ? `- Follow-through: they've completed ${h.completedSteps} of their last ${h.suggestedSteps} suggested steps.` : '',
+          h.toolsEngaged ? `- Tools they actually engage with: ${JSON.stringify(h.toolsEngaged)} (breathing/grounding/journal counts).` : '',
+          h.lastStep ? `- Their most recent suggested step was "${h.lastStep.text}" (${h.lastStep.done ? 'they did it' : 'not done'}).` : '',
+        ].filter(Boolean).join('\n')
+      : '',
     input.avoidReframes?.length ? `Do NOT reuse or paraphrase these earlier reframes: ${JSON.stringify(input.avoidReframes)}.` : '',
     input.avoidSteps?.length ? `Do NOT reuse or paraphrase these earlier steps: ${JSON.stringify(input.avoidSteps)}.` : '',
     input.avoidValidations?.length ? `Do NOT reuse or paraphrase these earlier validations: ${JSON.stringify(input.avoidValidations)}.` : '',
     `WRITING RULES:`,
-    `- "validate" must be SPECIFIC to this exact situation and varied. NEVER use formulaic openers like "It's normal", "It makes sense", "It's okay", "Many people", "A lot of people", "That's understandable". Reflect back the specific tension in their words instead.`,
+    `- "validate" must be SPECIFIC to this exact moment and varied. NEVER use formulaic openers like "It's normal", "It makes sense", "It's okay", "Many people", "A lot of people", "That's understandable". Reflect back the specific tension in their words instead.`,
     `- "reframe" is a fuller cognitive restructuring — 3 to 4 sentences: (1) name the thinking trap gently, (2) offer the balanced alternative thought, (3) give a brief reason it holds up (evidence for/against, grounded in THEIR situation). Do NOT begin with "Another way", "Maybe", "Perhaps", or "Try to". Warm, plain, concrete.`,
-    `- "smallStep": vary the TYPE of step across CBT techniques — behavioural experiment, opposite action, urge-surf/delay, values-based action, grounding, self-compassion, reaching out, or problem-solving — pick the one that best fits this situation. Always concrete, with a when/where and a tiny time.`,
+    `- If a thinking pattern from BACKGROUND clearly recurs here, gently connect this moment to that pattern and BUILD on prior work (progress, not repetition) — without sounding like you're reciting a file.`,
+    `- "smallStep": vary the TYPE across CBT techniques — behavioural experiment, opposite action, urge-surf/delay, values-based action, grounding, self-compassion, reaching out, problem-solving, breathing, or journaling — pick what best fits. When it fits, PREFER a technique the user actually follows through on (see BACKGROUND follow-through/tools). Always concrete, with a when/where and a tiny time.`,
+    `- Set "tool" to the in-app tool that best supports the smallStep: "breathing" (paced/box/4-7-8 breathing), "grounding" (5-4-3-2-1 senses), "journal" (writing a thought/worry down), or "none" (step needs no in-app tool, e.g. texting a friend). If "breathing", set "toolVariant" to "box", "478", or "paced"; otherwise leave "toolVariant" empty. The smallStep wording must match the chosen tool.`,
     `- Vary phrasing each time; do not sound templated.`,
     `Return minified JSON with exactly these keys:`,
     `{"crisis":false,`,
@@ -134,10 +155,13 @@ async function generateReset(input: any) {
     `"smallStep":"one concrete action (varied CBT technique) with a when/where and a tiny time (<=140 chars)",`,
     `"narration":"a calm 3-5 sentence spoken script weaving the validation, the reframe, and the step naturally (<=520 chars)",`,
     `"keywords":["2-4 short lowercase thought tags, e.g. 'mind-reading','self-criticism'"],`,
-    `"distortion":"one plain-language thinking pattern name, or empty string"}`,
+    `"distortion":"one plain-language thinking pattern name, or empty string",`,
+    `"tool":"breathing|grounding|journal|none",`,
+    `"toolVariant":"box|478|paced|"}`,
   ].filter(Boolean).join('\n');
 
   const data = await chatJSON(prompt);
+  const tool = ['breathing', 'grounding', 'journal', 'none'].includes(data.tool) ? data.tool : 'none';
   const out = {
     crisis: Boolean(data.crisis),
     validate: String(data.validate ?? ''),
@@ -146,6 +170,8 @@ async function generateReset(input: any) {
     narration: String(data.narration ?? ''),
     keywords: Array.isArray(data.keywords) ? data.keywords.slice(0, 4).map((k: any) => String(k)) : [],
     distortion: String(data.distortion ?? ''),
+    tool,
+    toolVariant: tool === 'breathing' && ['box', '478', 'paced'].includes(data.toolVariant) ? data.toolVariant : '',
   };
   if (out.reframe && (await moderationFlagged(`${out.reframe} ${out.smallStep} ${out.narration}`))) return crisisResult();
   return out;

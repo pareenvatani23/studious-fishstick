@@ -41,8 +41,10 @@ export function ResetDetailScreen({ route }: Props) {
     );
   }
 
-  const situationLabel = reset.customSituation?.trim() || (reset.situationId ? situationById(reset.situationId)?.label : '') || 'A moment';
+  const situationLabel = (reset.situations && reset.situations.length ? reset.situations.join(' · ') : reset.customSituation?.trim() || (reset.situationId ? situationById(reset.situationId)?.label : '')) || 'A moment';
+  const feelings = reset.emotions && reset.emotions.length ? reset.emotions : reset.emotion ? [reset.emotion] : [];
   const done = reset.outcome === 'done';
+  const toolsUsed = (reset.toolsUsed ?? []).filter((t) => t.completed);
 
   return (
     <Screen scroll contentStyle={{ paddingBottom: sizing.tabBar + spacing.xl }}>
@@ -54,7 +56,7 @@ export function ResetDetailScreen({ route }: Props) {
       <AppText size={26} weight="700" lineHeightMultiple={1.2} style={{ marginTop: spacing.xs }}>{situationLabel}</AppText>
 
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.md }}>
-        {reset.emotion ? <Chip label={reset.emotion} intent="lavender" readOnly /> : null}
+        {feelings.map((f, i) => <Chip key={`f-${i}`} label={f} intent="lavender" readOnly />)}
         {typeof reset.heaviness === 'number' ? <Chip label={`Heaviness ${reset.heaviness}/5`} intent="teal" readOnly /> : null}
         {reset.distortion ? <Chip label={reset.distortion} intent="teal" readOnly /> : null}
       </View>
@@ -85,6 +87,21 @@ export function ResetDetailScreen({ route }: Props) {
           <AppText size={13} color={done ? c.success : c.muted} style={{ marginTop: spacing.md }}>
             {done ? 'You marked this done. Nice.' : 'Not marked done — that’s okay.'}
           </AppText>
+        </Card>
+      ) : null}
+
+      {toolsUsed.length > 0 ? (
+        <Card style={{ marginTop: spacing.md }}>
+          <SectionLabel>Tools you used</SectionLabel>
+          <View style={{ gap: spacing.sm, marginTop: spacing.sm }}>
+            {toolsUsed.map((t, i) => (
+              <View key={`t-${i}`} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+                <Icon name={t.tool === 'breathing' ? 'breathe' : t.tool === 'grounding' ? 'target' : 'edit'} color={c.teal} size={18} />
+                <AppText size={15} style={{ flex: 1, textTransform: 'capitalize' }}>{t.tool}{t.variant ? ` · ${t.variant}` : ''}</AppText>
+                {typeof t.seconds === 'number' && t.seconds > 0 ? <AppText size={13} color={c.muted}>{t.seconds}s</AppText> : null}
+              </View>
+            ))}
+          </View>
         </Card>
       ) : null}
 

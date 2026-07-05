@@ -8,6 +8,8 @@ import { invokeAI } from './edge';
  * we keep a cheap local crisis pre-check for an instant, offline response.
  */
 
+export type ToolKind = 'breathing' | 'grounding' | 'journal' | 'none';
+
 /** Structured result for one reset. */
 export interface AIReset {
   crisis: boolean;
@@ -17,6 +19,20 @@ export interface AIReset {
   narration: string;
   keywords: string[];
   distortion: string;
+  /** in-app tool the small step maps to (for the inline "Do it now") */
+  tool: ToolKind;
+  toolVariant: string; // breathing: box|478|paced
+}
+
+/** Compact "patient history" the reframe conditions on. */
+export interface ResetHistory {
+  recentSituations?: string[];
+  recentEmotions?: string[];
+  distortions?: string[];
+  suggestedSteps?: number;
+  completedSteps?: number;
+  toolsEngaged?: Record<string, number>;
+  lastStep?: { text: string; done: boolean } | null;
 }
 
 interface GenerateInput {
@@ -24,14 +40,17 @@ interface GenerateInput {
   customSituation?: string;
   heaviness?: number;
   emotion?: string;
+  emotions?: string[];
+  situations?: string[];
   note?: string;
+  history?: ResetHistory;
   avoidReframes?: string[];
   avoidSteps?: string[];
   avoidValidations?: string[];
 }
 
 function crisisResult(): AIReset {
-  return { crisis: true, validate: '', reframe: '', smallStep: '', narration: '', keywords: [], distortion: '' };
+  return { crisis: true, validate: '', reframe: '', smallStep: '', narration: '', keywords: [], distortion: '', tool: 'none', toolVariant: '' };
 }
 
 /** Generate the personalised reset content via the edge function. */
@@ -40,6 +59,7 @@ export async function generateReset(input: GenerateInput): Promise<AIReset> {
   if (localCrisisCheck(userText) || localCrisisCheck(input.situationLabel)) return crisisResult();
 
   const data = await invokeAI<Partial<AIReset>>('generateReset', input);
+  const tool = (['breathing', 'grounding', 'journal', 'none'] as const).includes(data.tool as any) ? (data.tool as ToolKind) : 'none';
   return {
     crisis: Boolean(data.crisis),
     validate: String(data.validate ?? ''),
@@ -48,6 +68,8 @@ export async function generateReset(input: GenerateInput): Promise<AIReset> {
     narration: String(data.narration ?? ''),
     keywords: Array.isArray(data.keywords) ? data.keywords.slice(0, 4).map((k: any) => String(k)) : [],
     distortion: String(data.distortion ?? ''),
+    tool,
+    toolVariant: String(data.toolVariant ?? ''),
   };
 }
 

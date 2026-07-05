@@ -20,10 +20,12 @@ const OPTIONS: { id: Outcome; title: string; sub: string }[] = [
 /** Step 3 — gentle close (peak-end). Commits the Reset. Supportive, no pressure. */
 export function DoneScreen() {
   const { theme, tint } = useTheme();
-  const { commit } = useResetFlow();
+  const { commit, draft } = useResetFlow();
   const nav = useRootNav();
   const c = theme.colors;
-  const [outcome, setOutcome] = useState<Outcome | undefined>();
+  // If they completed the suggested tool inline, default to "I did it".
+  const toolDone = (draft.toolsUsed ?? []).some((t) => t.completed);
+  const [outcome, setOutcome] = useState<Outcome | undefined>(toolDone ? 'done' : undefined);
 
   const save = () => {
     commit({ outcome });

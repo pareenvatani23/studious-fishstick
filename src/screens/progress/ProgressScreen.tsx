@@ -13,6 +13,7 @@ import { useResetFlow } from '../../store/ResetFlow';
 import { useRootNav } from '../../navigation/hooks';
 import { situationById } from '../../data/situations';
 import { listReports, generateReport, reportDownloadUrl, type WeeklyReport } from '../../supabase/reports';
+import { countStandaloneToolSessions } from '../../supabase/tools';
 import { radius, spacing, sizing } from '../../theme/tokens';
 
 /** distinct days with a reset in the last `days` days. */
@@ -40,9 +41,13 @@ export function ProgressScreen() {
 
   const [reports, setReports] = useState<WeeklyReport[]>([]);
   const [genBusy, setGenBusy] = useState(false);
+  const [standaloneTools, setStandaloneTools] = useState(0);
 
   const loadReports = useCallback(() => { listReports().then(setReports).catch(() => {}); }, []);
-  useEffect(() => { loadReports(); }, [loadReports]);
+  useEffect(() => { loadReports(); countStandaloneToolSessions().then(setStandaloneTools).catch(() => {}); }, [loadReports]);
+
+  // tool practices: completed tool sessions inside resets + standalone sessions
+  const toolPractices = resets.reduce((n, r) => n + (r.toolsUsed ?? []).filter((t) => t.completed).length, 0) + standaloneTools;
 
   const onGenerate = async () => {
     setGenBusy(true);
@@ -143,6 +148,10 @@ export function ProgressScreen() {
           <View>
             <AppText size={22} weight="700" color={c.lavender}>{lessonsWatched.length}</AppText>
             <AppText size={12} color={c.muted}>Lessons learned</AppText>
+          </View>
+          <View>
+            <AppText size={22} weight="700" color={c.success}>{toolPractices}</AppText>
+            <AppText size={12} color={c.muted}>Tools used</AppText>
           </View>
         </View>
         <AppText size={14} color={c.text2} lineHeightMultiple={1.5} style={{ marginTop: spacing.md }}>{consistencyNote}</AppText>

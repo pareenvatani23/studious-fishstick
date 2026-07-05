@@ -4,6 +4,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Screen } from '../../components/Screen';
 import { AppText } from '../../components/AppText';
 import { WaveMark } from '../../components/WaveMark';
+import { Icon, IconName } from '../../components/icons';
+import { SectionLabel } from '../../components/Settings';
 import { useTheme } from '../../theme/ThemeContext';
 import { useApp } from '../../store/AppState';
 import { useResetFlow } from '../../store/ResetFlow';
@@ -52,6 +54,30 @@ export function HomeScreen() {
           ? 'Your first reset is here whenever you’re ready. No rush.'
           : `You’ve reset ${stats.totalResets} ${stats.totalResets === 1 ? 'time' : 'times'}. Steadier, one step at a time.`}
       </AppText>
+
+      {/* Quick tools — usable any time, not only inside a reset */}
+      <SectionLabel style={{ marginTop: spacing.xxxl }}>Calm-down tools</SectionLabel>
+      <View style={{ flexDirection: 'row', gap: spacing.md, marginTop: spacing.md }}>
+        {([
+          { label: 'Breathe', sub: 'Box · 4-7-8', icon: 'breathe' as IconName, go: () => nav.navigate('ToolBreathing', { mode: 'standalone', variant: 'box' }) },
+          { label: 'Ground', sub: '5-4-3-2-1', icon: 'target' as IconName, go: () => nav.navigate('ToolGrounding', { mode: 'standalone' }) },
+          { label: 'Note', sub: 'Journal it', icon: 'edit' as IconName, go: () => nav.navigate('ToolJournal', { mode: 'standalone' }) },
+        ]).map((t) => (
+          <Pressable
+            key={t.label}
+            onPress={t.go}
+            accessibilityRole="button"
+            accessibilityLabel={`${t.label} tool, ${t.sub}`}
+            style={{ flex: 1, alignItems: 'center', gap: spacing.sm, backgroundColor: c.card, borderWidth: c.borderWidth, borderColor: c.border, borderRadius: radius.lg, paddingVertical: spacing.lg }}
+          >
+            <View style={{ width: 44, height: 44, borderRadius: radius.full, backgroundColor: tint(c.teal, 0.12), alignItems: 'center', justifyContent: 'center' }}>
+              <Icon name={t.icon} color={c.teal} size={22} />
+            </View>
+            <AppText size={14} weight="600">{t.label}</AppText>
+            <AppText size={11} color={c.muted}>{t.sub}</AppText>
+          </Pressable>
+        ))}
+      </View>
     </Screen>
   );
 }

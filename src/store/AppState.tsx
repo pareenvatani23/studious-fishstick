@@ -13,18 +13,29 @@ import { useAuth } from '../supabase/auth';
 export type Outcome = 'done' | 'notyet';
 export type TextSizeName = 'Normal' | 'Large' | 'Largest';
 
+export interface ToolUse {
+  tool: string;
+  variant?: string;
+  seconds?: number;
+  completed: boolean;
+  at: string;
+}
+
 export interface ResetRecord {
   id: string; // == client_id
   date: string; // ISO
   heaviness?: number;
   emotion?: string;
+  emotions?: string[];
   situationId?: string;
   customSituation?: string;
+  situations?: string[];
   note?: string;
   reframe?: string;
   actionText?: string;
   keywords?: string[];
   distortion?: string;
+  toolsUsed?: ToolUse[];
   outcome?: Outcome;
 }
 
@@ -109,11 +120,14 @@ function rowToReset(row: any): ResetRecord {
     emotion: row.emotion ?? undefined,
     situationId: row.situation_id ?? undefined,
     customSituation: row.custom_situation ?? undefined,
+    situations: Array.isArray(row.situations) ? row.situations : undefined,
+    emotions: Array.isArray(row.emotions) ? row.emotions : undefined,
     note: row.note ?? undefined,
     reframe: row.reframe ?? undefined,
     actionText: row.action_text ?? undefined,
     keywords: Array.isArray(row.keywords) ? row.keywords : undefined,
     distortion: row.distortion ?? undefined,
+    toolsUsed: Array.isArray(row.tools_used) ? row.tools_used : undefined,
     outcome: row.outcome ?? undefined,
   };
 }
@@ -285,13 +299,16 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           occurred_at: record.date,
           heaviness: record.heaviness ?? null,
           emotion: record.emotion ?? null,
+          emotions: record.emotions ?? null,
           situation_id: record.situationId ?? null,
           custom_situation: record.customSituation ?? null,
+          situations: record.situations ?? null,
           note: record.note ?? null,
           reframe: record.reframe ?? null,
           action_text: record.actionText ?? null,
           keywords: record.keywords ?? null,
           distortion: record.distortion ?? null,
+          tools_used: record.toolsUsed ?? [],
           outcome: record.outcome ?? null,
         }).then(() => {}, () => {});
       }

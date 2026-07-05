@@ -31,6 +31,11 @@ export type RootStackParamList = {
   ResetDone: undefined;
   ResetDetail: { id: string };
 
+  // Interactive tools (usable standalone or inline as the "one small step")
+  ToolBreathing: { mode?: 'action' | 'standalone'; variant?: string } | undefined;
+  ToolGrounding: { mode?: 'action' | 'standalone' } | undefined;
+  ToolJournal: { mode?: 'action' | 'standalone'; prompt?: string } | undefined;
+
   // Detail / settings
   VideoLesson: { lessonId: string };
   HowToUse: undefined;

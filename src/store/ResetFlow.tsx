@@ -9,19 +9,38 @@ import { useApp } from './AppState';
  * A ref mirrors the draft so commit() always sees the latest values even when
  * called in the same tick as update() (avoids a stale-closure save).
  */
+export interface ToolUse {
+  tool: string; // 'breathing' | 'grounding' | 'journal'
+  variant?: string;
+  seconds?: number;
+  completed: boolean;
+  at: string;
+}
+
 interface Draft {
   heaviness?: number;
+  /** primary feeling (first of emotions) — kept for existing charts */
   emotion?: string;
+  /** up to 3 named feelings */
+  emotions?: string[];
+  /** primary situation id — kept for existing charts */
   situationId?: string;
   situationLabel?: string;
   customSituation?: string;
+  /** up to 2 situation labels */
+  situations?: string[];
+  situationIds?: string[];
   note?: string;
   reframe?: string;
   actionText?: string;
   narration?: string;
   keywords?: string[];
   distortion?: string;
+  /** machine hint for the inline tool the small step maps to */
+  tool?: string;
   aiGenerated?: boolean;
+  /** tool sessions completed as part of this reset */
+  toolsUsed?: ToolUse[];
   outcome?: 'done' | 'notyet';
 }
 
@@ -57,14 +76,17 @@ export function ResetFlowProvider({ children }: { children: React.ReactNode }) {
       draftRef.current = d;
       recordReset({
         heaviness: d.heaviness,
-        emotion: d.emotion,
-        situationId: d.situationId,
+        emotion: d.emotion ?? d.emotions?.[0],
+        emotions: d.emotions,
+        situationId: d.situationId ?? d.situationIds?.[0],
         customSituation: d.customSituation,
+        situations: d.situations,
         note: d.note,
         reframe: d.reframe,
         actionText: d.actionText,
         keywords: d.keywords,
         distortion: d.distortion,
+        toolsUsed: d.toolsUsed,
         outcome: d.outcome,
       });
     },

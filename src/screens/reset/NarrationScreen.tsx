@@ -31,6 +31,8 @@ interface Content {
   narration: string;
   keywords: string[];
   distortion: string;
+  tool: 'breathing' | 'grounding' | 'journal' | 'none';
+  toolVariant: string;
   source: 'ai' | 'fallback';
 }
 
@@ -57,6 +59,26 @@ export function NarrationScreen() {
     reframes: resets.map((r) => r.reframe).filter(Boolean) as string[],
     steps: resets.map((r) => r.actionText).filter(Boolean) as string[],
   };
+
+  // Compact "patient history" the reframe conditions on (patterns + adherence).
+  const buildHistory = useCallback(() => {
+    const recentSituations = resets.flatMap((r) => r.situations ?? [r.customSituation || situationById(r.situationId ?? '')?.label]).filter(Boolean).slice(0, 8) as string[];
+    const recentEmotions = resets.flatMap((r) => r.emotions ?? [r.emotion]).filter(Boolean).slice(0, 8) as string[];
+    const distortions = resets.map((r) => r.distortion).filter(Boolean).slice(0, 6) as string[];
+    const withStep = resets.filter((r) => r.actionText).slice(0, 10);
+    const toolsEngaged: Record<string, number> = {};
+    resets.forEach((r) => (r.toolsUsed ?? []).forEach((t) => { if (t.completed) toolsEngaged[t.tool] = (toolsEngaged[t.tool] || 0) + 1; }));
+    const last = resets[0];
+    return {
+      recentSituations,
+      recentEmotions,
+      distortions,
+      suggestedSteps: withStep.length,
+      completedSteps: withStep.filter((r) => r.outcome === 'done').length,
+      toolsEngaged,
+      lastStep: last?.actionText ? { text: last.actionText, done: last.outcome === 'done' } : null,
+    };
+  }, [resets]);
 
   useEffect(() => {
     if (reduceMotion) return;
@@ -124,6 +146,8 @@ export function NarrationScreen() {
     narration: `${situation.validate} ${situation.reframe} A small step: ${situation.actions[0].text}`,
     keywords: [],
     distortion: '',
+    tool: 'none',
+    toolVariant: '',
     source: 'fallback',
   }), [situation]);
 
@@ -136,7 +160,10 @@ export function NarrationScreen() {
           customSituation: draft.customSituation,
           heaviness: draft.heaviness,
           emotion: draft.emotion,
+          emotions: draft.emotions,
+          situations: draft.situations,
           note: draft.note,
+          history: buildHistory(),
           avoidReframes: avoidR,
           avoidSteps: avoidS,
         });
@@ -151,6 +178,8 @@ export function NarrationScreen() {
           narration: r.narration || `${r.validate} ${r.reframe} A small step: ${r.smallStep}`,
           keywords: r.keywords || [],
           distortion: r.distortion || '',
+          tool: r.tool || 'none',
+          toolVariant: r.toolVariant || '',
           source: 'ai',
         };
       } catch {
@@ -162,7 +191,7 @@ export function NarrationScreen() {
 
   const apply = useCallback((ct: Content) => {
     setContent(ct);
-    update({ reframe: ct.reframe, actionText: ct.step, narration: ct.narration, keywords: ct.keywords, distortion: ct.distortion, aiGenerated: ct.source === 'ai' });
+    update({ reframe: ct.reframe, actionText: ct.step, narration: ct.narration, keywords: ct.keywords, distortion: ct.distortion, tool: ct.tool, aiGenerated: ct.source === 'ai' });
   }, [update]);
 
   // first generation + autoplay
@@ -199,6 +228,16 @@ export function NarrationScreen() {
   }, [audio, content, prepare]);
 
   const cont = async () => { update({ note: note.trim() || undefined }); await stopAudio(); nav.navigate('ResetDone'); };
+
+  // Inline tool for the small step (adherence: doing it marks the action done).
+  const toolDone = (draft.toolsUsed ?? []).some((t) => t.completed);
+  const launchTool = async () => {
+    if (!content) return;
+    await stopAudio();
+    if (content.tool === 'breathing') nav.navigate('ToolBreathing', { mode: 'action', variant: content.toolVariant || 'box' });
+    else if (content.tool === 'grounding') nav.navigate('ToolGrounding', { mode: 'action' });
+    else if (content.tool === 'journal') nav.navigate('ToolJournal', { mode: 'action' });
+  };
 
   if (loading || !content) {
     return (
@@ -247,6 +286,21 @@ export function NarrationScreen() {
       <Card intent="accent" style={{ marginTop: spacing.md, borderColor: tint(c.teal, 0.3) }}>
         <AppText size={12} weight="700" color={c.muted} uppercase letterSpacing={0.8} style={{ marginBottom: spacing.sm }}>One small step</AppText>
         <AppText size={17} weight="600" lineHeightMultiple={1.35}>{content.step}</AppText>
+        {content.tool !== 'none' && (
+          toolDone ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.md }}>
+              <Icon name="check" color={c.success} size={18} strokeWidth={2.4} />
+              <AppText size={14} color={c.success}>Done — nicely done.</AppText>
+            </View>
+          ) : (
+            <View style={{ marginTop: spacing.md }}>
+              <Button
+                label={content.tool === 'breathing' ? 'Do the breathing now' : content.tool === 'grounding' ? 'Do the grounding now' : 'Write it now'}
+                onPress={launchTool}
+              />
+            </View>
+          )
+        )}
       </Card>
 
       {/* optional, intuitive note */}
