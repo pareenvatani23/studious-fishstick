@@ -199,7 +199,7 @@ export function NarrationScreen() {
     (async () => {
       setLoading(true);
       const ct = await generate(recent.reframes.slice(0, 6), recent.steps.slice(0, 6));
-      if (ct) { apply(ct); setLoading(false); prepare(ct.narration); }
+      if (ct) { apply(ct); setLoading(false); } // play-on-tap: no auto-synth (cost)
     })();
     return () => { stopAudio(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -210,7 +210,7 @@ export function NarrationScreen() {
     await stopAudio();
     setLoading(true);
     const ct = await generate([content.reframe, ...recent.reframes].slice(0, 6), [content.step, ...recent.steps].slice(0, 6));
-    if (ct) { apply(ct); setLoading(false); prepare(ct.narration); }
+    if (ct) { apply(ct); setLoading(false); } // play-on-tap
   };
 
   const toggle = useCallback(async () => {

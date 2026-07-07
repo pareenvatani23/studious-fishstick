@@ -123,60 +123,69 @@ Deno.serve(async (req) => {
   const force = !!reqBody?.force; // test-only: bypass time-of-day gates
 
   const now = new Date();
+  const weekAgo = new Date(now.getTime() - 7 * 86400000).toISOString();
   const res = await sb(`profiles?select=id,name,expo_push_token,reminder_hour,timezone,plan,plan_date,push_last_sent_on,last_lesson_push_on,lessons_watched&reminder_enabled=eq.true&expo_push_token=not.is.null`);
   if (!res.ok) return json({ error: `profiles ${res.status}` }, 502);
   const profiles: any[] = await res.json();
 
-  const pushes: any[] = [];
-  const patch: { id: string; body: any }[] = [];
+  // Cheap in-memory pass: only users DUE in this window get any DB/AI work.
+  // (Everyone else costs nothing but an Intl call.)
+  const due = profiles.map((p) => {
+    const lp = localParts(now, p.timezone || 'UTC');
+    return { p, lp, localDate: dateStr(lp), resetDue: force || (lp.h === p.reminder_hour && lp.mi < 30), lessonDue: force || (lp.h === LESSON_HOUR && lp.mi < 30) };
+  }).filter((d) => d.resetDue || d.lessonDue);
+
   let planned = 0;
+  const pushes: any[] = [];
+  const patchMap: Record<string, any> = {};
+  const addPatch = (id: string, body: any) => { patchMap[id] = { ...(patchMap[id] || {}), ...body }; };
 
-  for (const p of profiles) {
-    const tz = p.timezone || 'UTC';
-    const lp = localParts(now, tz);
-    const localDate = dateStr(lp);
-
-    // did they reset today (local day)?
+  async function processOne(d: any) {
+    const { p, lp, localDate, resetDue, lessonDue } = d;
     const secs = lp.h * 3600 + lp.mi * 60 + lp.s;
     const localMidnight = new Date(now.getTime() - secs * 1000).toISOString();
-    const rr = await sb(`resets?select=id,heaviness,emotion,distortion,situation_id,custom_situation,occurred_at&user_id=eq.${p.id}&occurred_at=gte.${new Date(now.getTime() - 7 * 86400000).toISOString()}&order=occurred_at.desc`);
+    const rr = await sb(`resets?select=id,heaviness,emotion,distortion,situation_id,custom_situation,occurred_at&user_id=eq.${p.id}&occurred_at=gte.${weekAgo}&order=occurred_at.desc`);
     const resets7 = rr.ok ? await rr.json() : [];
     const resetToday = Array.isArray(resets7) && resets7.some((r: any) => r.occurred_at >= localMidnight);
 
-    // build/refresh today's plan once per local day
     let plan = p.plan;
     if (p.plan_date !== localDate || !plan) {
       plan = await buildPlan(p, lp, Array.isArray(resets7) ? resets7 : [], resetToday);
       planned += 1;
-      await sb(`profiles?id=eq.${p.id}`, { method: 'PATCH', body: JSON.stringify({ plan, plan_date: localDate }) });
+      addPatch(p.id, { plan, plan_date: localDate });
     }
-
-    // RESET reminder at reminder hour
-    if ((force || (lp.h === p.reminder_hour && lp.mi < 30)) && plan.sendReset && !resetToday && p.push_last_sent_on !== localDate) {
+    if (resetDue && plan.sendReset && !resetToday && p.push_last_sent_on !== localDate) {
       const recentSituations: string[] = (Array.isArray(resets7) ? resets7 : []).map((x: any) => x.custom_situation || x.situation_id).filter(Boolean);
       const msg = await resetMessage(p.name ?? 'there', recentSituations);
       pushes.push({ to: p.expo_push_token, title: msg.title, body: msg.body, sound: 'default', channelId: 'reminders', data: { type: 'reset' } });
-      patch.push({ id: p.id, body: { push_last_sent_on: localDate } });
+      addPatch(p.id, { push_last_sent_on: localDate });
     }
-
-    // LESSON suggestion at local midday (staggered)
-    if ((force || (lp.h === LESSON_HOUR && lp.mi < 30)) && plan.sendLesson && p.last_lesson_push_on !== localDate) {
+    if (lessonDue && plan.sendLesson && p.last_lesson_push_on !== localDate) {
       const lesson = await pickLesson(Array.isArray(p.lessons_watched) ? p.lessons_watched : []);
       if (lesson) {
         pushes.push({ to: p.expo_push_token, title: 'A lesson that might help', body: lesson.title, sound: 'default', channelId: 'reminders', data: { type: 'lesson', lessonId: lesson.id } });
-        patch.push({ id: p.id, body: { last_lesson_push_on: localDate } });
+        addPatch(p.id, { last_lesson_push_on: localDate });
       }
     }
   }
 
-  let sent = 0;
-  if (pushes.length) {
-    try {
-      const pr = await fetch('https://exp.host/--/api/v2/push/send', { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(pushes) });
-      if (pr.ok) sent = pushes.length;
-    } catch {}
-    for (const u of patch) await sb(`profiles?id=eq.${u.id}`, { method: 'PATCH', body: JSON.stringify(u.body) });
+  // bounded concurrency
+  const CONC = 8;
+  for (let i = 0; i < due.length; i += CONC) {
+    await Promise.all(due.slice(i, i + CONC).map(processOne));
   }
 
-  return json({ ok: true, candidates: profiles.length, planned, sent });
+  // batch Expo push (max 100/request)
+  let sent = 0;
+  for (let i = 0; i < pushes.length; i += 100) {
+    const batch = pushes.slice(i, i + 100);
+    try {
+      const pr = await fetch('https://exp.host/--/api/v2/push/send', { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(batch) });
+      if (pr.ok) sent += batch.length;
+    } catch {}
+  }
+  // one merged PATCH per user
+  await Promise.all(Object.entries(patchMap).map(([id, body]) => sb(`profiles?id=eq.${id}`, { method: 'PATCH', body: JSON.stringify(body) })));
+
+  return json({ ok: true, candidates: profiles.length, due: due.length, planned, sent });
 });
