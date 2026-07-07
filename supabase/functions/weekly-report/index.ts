@@ -119,54 +119,66 @@ function wrap(text: string, font: any, size: number, maxWidth: number): string[]
   return lines;
 }
 
-async function buildPdf(name: string, range: string, agg: any, summary: string): Promise<Uint8Array> {
+async function buildPdf(name: string, range: string, agg: any, summary: string, resonated: string[]): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
-  const page = doc.addPage([595, 842]);
   const font = await doc.embedFont(StandardFonts.Helvetica);
   const bold = await doc.embedFont(StandardFonts.HelveticaBold);
   const M = 48;
   const W = 595 - M * 2;
-  let y = 842 - 56;
-  const text = (t: string, x: number, yy: number, size: number, f = font, color = INK) => page.drawText(t, { x, y: yy, size, font: f, color });
-  const sectionLabel = (t: string, yy: number) => text(t.toUpperCase(), M, yy, 10, bold, TEAL);
+  const TOP = 842 - 56;
+  const BOTTOM = 60; // keep clear of footer
+  let page = doc.addPage([595, 842]);
+  let y = TOP;
 
-  text('Your week on TrueShift', M, y, 24, bold);
-  y -= 22; text(range, M, y, 11, font, MUTED); y -= 30;
+  const text = (t: string, x: number, yy: number, size: number, f = font, color = INK) => page.drawText(t, { x, y: yy, size, font: f, color });
+  const rect = (x: number, yy: number, w: number, h: number, opts: any) => page.drawRectangle({ x, y: yy, width: w, height: h, ...opts });
+  // start a new page if the next block (height h) wouldn't fit
+  const ensure = (h: number) => { if (y - h < BOTTOM) { page = doc.addPage([595, 842]); y = TOP; } };
+  const sectionLabel = (t: string) => { ensure(28); text(t.toUpperCase(), M, y, 10, bold, TEAL); y -= 16; };
+
+  // Header
+  text('Your week on TrueShift', M, y, 24, bold); y -= 22;
+  text(range, M, y, 11, font, MUTED); y -= 30;
+
+  // Stat tiles
   const tiles = [['Resets', String(agg.total)], ['Steps taken', String(agg.actionsDone)], ['Active days', String(agg.weekly.filter((d: any) => d.value > 0).length)]];
   const tw = (W - 20) / 3;
   tiles.forEach((t, i) => {
     const x = M + i * (tw + 10);
-    page.drawRectangle({ x, y: y - 46, width: tw, height: 46, borderColor: LINE, borderWidth: 1, color: rgb(0.98, 0.99, 0.99) });
+    rect(x, y - 46, tw, 46, { borderColor: LINE, borderWidth: 1, color: rgb(0.98, 0.99, 0.99) });
     text(t[1], x + 12, y - 24, 22, bold, i === 0 ? TEAL : i === 1 ? rgb(0.4, 0.72, 0.5) : LAV);
     text(t[0], x + 12, y - 40, 9, font, MUTED);
   });
   y -= 74;
 
-  sectionLabel('This week', y); y -= 16;
-  const chartH = 70, baseY = y - chartH;
+  // Weekly activity chart
+  sectionLabel('This week');
+  const chartH = 64;
+  const baseY = y - chartH;
   const maxV = Math.max(1, ...agg.weekly.map((d: any) => d.value));
   const bw = W / 7;
   agg.weekly.forEach((d: any, i: number) => {
     const bh = (d.value / maxV) * chartH;
     const x = M + i * bw + 6;
-    page.drawRectangle({ x, y: baseY, width: bw - 12, height: Math.max(2, bh), color: d.value ? TEAL : rgb(0.9, 0.92, 0.92) });
+    rect(x, baseY, bw - 12, Math.max(2, bh), { color: d.value ? TEAL : rgb(0.9, 0.92, 0.92) });
     text(d.label, x + (bw - 12) / 2 - 8, baseY - 12, 8, font, MUTED);
     if (d.value) text(String(d.value), x + (bw - 12) / 2 - 3, baseY + Math.max(2, bh) + 3, 8, bold, MUTED);
   });
-  y = baseY - 28;
+  y = baseY - 40; // clear gap so day labels don't collide with the next section
 
+  // Two columns: what came up + feelings (paginate together)
   const colW = (W - 20) / 2;
+  const rows = Math.max(agg.situations.length, agg.emotions.length, 1);
+  ensure(16 + rows * 30 + 12);
   const startY = y;
   const barList = (title: string, items: [string, number][], x: number, yTop: number, color: any) => {
     let yy = yTop;
-    sectionLabel(title, yy); yy -= 16;
+    text(title.toUpperCase(), x, yy, 10, bold, TEAL); yy -= 16;
     if (!items.length) { text('—', x, yy, 11, font, MUTED); return yy - 16; }
     const maxN = Math.max(...items.map((i) => i[1]));
     for (const [label, n] of items) {
-      const bw2 = Math.max(6, (n / maxN) * colW);
-      page.drawRectangle({ x, y: yy - 10, width: bw2, height: 10, color });
-      const short = label.length > 26 ? label.slice(0, 25) + '…' : label;
-      text(short, x, yy - 22, 9.5, font, INK);
+      rect(x, yy - 10, Math.max(6, (n / maxN) * colW), 10, { color });
+      text(label.length > 26 ? label.slice(0, 25) + '…' : label, x, yy - 22, 9.5, font, INK);
       text(String(n), x + colW - 12, yy - 9, 9, bold, MUTED);
       yy -= 30;
     }
@@ -174,32 +186,51 @@ async function buildPdf(name: string, range: string, agg: any, summary: string):
   };
   const endL = barList('What came up', agg.situations, M, startY, rgb(0.85, 0.9, 0.88));
   const endR = barList('Feelings', agg.emotions, M + colW + 20, startY, rgb(0.9, 0.88, 0.95));
-  y = Math.min(endL, endR) - 10;
+  y = Math.min(endL, endR) - 12;
 
-  sectionLabel('Thinking patterns that recurred', y); y -= 16;
-  if (agg.distortions.length) { for (const [n2, n] of agg.distortions) { text(`•  ${n2}`, M, y, 11, font, INK); text(`${n}×`, M + W - 24, y, 10, bold, MUTED); y -= 16; } }
-  else { text('—', M, y, 11, font, MUTED); y -= 16; }
+  // Thinking patterns
+  sectionLabel('Thinking patterns that recurred');
+  if (agg.distortions.length) {
+    for (const [n2, n] of agg.distortions) { ensure(16); text(`•  ${n2}`, M, y, 11, font, INK); text(`${n}×`, M + W - 24, y, 10, bold, MUTED); y -= 16; }
+  } else { text('—', M, y, 11, font, MUTED); y -= 16; }
   y -= 10;
 
-  sectionLabel('Your thoughts this week', y); y -= 18;
+  // Thought cloud
+  sectionLabel('Your thoughts this week');
   if (agg.keywords.length) {
     const maxK = agg.keywords[0][1];
-    let x = M; let rowY = y;
+    let x = M;
     for (const [word, n] of agg.keywords) {
       const size = 10 + Math.round((n / maxK) * 10);
       const w = font.widthOfTextAtSize(word, size) + 14;
-      if (x + w > M + W) { x = M; rowY -= 26; }
-      page.drawRectangle({ x, y: rowY - 6, width: w, height: size + 8, color: rgb(0.95, 0.93, 0.98), borderColor: rgb(0.85, 0.82, 0.92), borderWidth: 0.5 });
-      text(word, x + 7, rowY, size, font, rgb(0.42, 0.36, 0.6));
+      if (x + w > M + W) { x = M; y -= 26; ensure(26); }
+      rect(x, y - 6, w, size + 8, { color: rgb(0.95, 0.93, 0.98), borderColor: rgb(0.85, 0.82, 0.92), borderWidth: 0.5 });
+      text(word, x + 7, y, size, font, rgb(0.42, 0.36, 0.6));
       x += w + 8;
     }
-    y = rowY - 30;
+    y -= 30;
   } else { text('—', M, y, 11, font, MUTED); y -= 20; }
 
+  // What resonated (community messages the user reacted to / saved)
+  if (resonated.length) {
+    sectionLabel('What resonated with you');
+    for (const msg of resonated.slice(0, 4)) {
+      const lines = wrap(`“${msg}”`, font, 11, W - 16);
+      ensure(lines.length * 15 + 12);
+      for (const ln of lines) { text(ln, M + 8, y, 11, font, rgb(0.42, 0.36, 0.6)); y -= 15; }
+      y -= 8;
+    }
+  }
+
+  // Reflection
+  ensure(20);
   page.drawLine({ start: { x: M, y }, end: { x: M + W, y }, thickness: 1, color: LINE }); y -= 20;
-  sectionLabel('Your reflection', y); y -= 16;
-  for (const ln of wrap(summary, font, 11.5, W)) { text(ln, M, y, 11.5, font, INK); y -= 16; }
-  text('TrueShift · a self-help reflection, not therapy or a crisis service.', M, 40, 8, font, MUTED);
+  sectionLabel('Your reflection');
+  for (const ln of wrap(summary, font, 11.5, W)) { ensure(16); text(ln, M, y, 11.5, font, INK); y -= 16; }
+
+  // Footer on every page
+  const pages = doc.getPages();
+  pages.forEach((pg) => pg.drawText('TrueShift · a self-help reflection, not therapy or a crisis service.', { x: M, y: 34, size: 8, font, color: MUTED }));
   return await doc.save();
 }
 
@@ -234,7 +265,18 @@ async function processUser(p: any, since: string, opts: { store: boolean; sendPu
   const psStr = start.toISOString().slice(0, 10);
   const peStr = now.toISOString().slice(0, 10);
   const fmt = (d: Date) => d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
-  const pdf = await buildPdf(name, `${fmt(start)} – ${fmt(now)}`, agg, summary);
+
+  // community messages that resonated (saved or reacted-to) this week
+  const resonated: string[] = [];
+  try {
+    const seen = new Set<string>();
+    for (const tbl of ['post_saves', 'post_reactions']) {
+      const rr = await sb(`${tbl}?select=posts(text)&user_id=eq.${p.id}&created_at=gte.${since}&order=created_at.desc&limit=6`);
+      if (rr.ok) for (const row of await rr.json()) { const t = row?.posts?.text; if (t && !seen.has(t)) { seen.add(t); resonated.push(t); } }
+    }
+  } catch { /* optional */ }
+
+  const pdf = await buildPdf(name, `${fmt(start)} – ${fmt(now)}`, agg, summary, resonated);
 
   let path: string | null = null;
   if (opts.store) {

@@ -14,6 +14,7 @@ import { useRootNav } from '../../navigation/hooks';
 import { situationById } from '../../data/situations';
 import { listReports, generateReport, reportDownloadUrl, type WeeklyReport } from '../../supabase/reports';
 import { countStandaloneToolSessions } from '../../supabase/tools';
+import { fetchRecentResonant } from '../../supabase/community';
 import { radius, spacing, sizing } from '../../theme/tokens';
 
 /** distinct days with a reset in the last `days` days. */
@@ -42,9 +43,14 @@ export function ProgressScreen() {
   const [reports, setReports] = useState<WeeklyReport[]>([]);
   const [genBusy, setGenBusy] = useState(false);
   const [standaloneTools, setStandaloneTools] = useState(0);
+  const [resonant, setResonant] = useState<string[]>([]);
 
   const loadReports = useCallback(() => { listReports().then(setReports).catch(() => {}); }, []);
-  useEffect(() => { loadReports(); countStandaloneToolSessions().then(setStandaloneTools).catch(() => {}); }, [loadReports]);
+  useEffect(() => {
+    loadReports();
+    countStandaloneToolSessions().then(setStandaloneTools).catch(() => {});
+    fetchRecentResonant(4).then(setResonant).catch(() => {});
+  }, [loadReports]);
 
   // tool practices: completed tool sessions inside resets + standalone sessions
   const toolPractices = resets.reduce((n, r) => n + (r.toolsUsed ?? []).filter((t) => t.completed).length, 0) + standaloneTools;
@@ -156,6 +162,21 @@ export function ProgressScreen() {
         </View>
         <AppText size={14} color={c.text2} lineHeightMultiple={1.5} style={{ marginTop: spacing.md }}>{consistencyNote}</AppText>
       </Card>
+
+      {/* what resonated from the community */}
+      {resonant.length > 0 && (
+        <Card style={{ marginTop: spacing.md }}>
+          <SectionLabel>What resonated with you</SectionLabel>
+          <View style={{ gap: spacing.md, marginTop: spacing.md }}>
+            {resonant.map((t, i) => (
+              <View key={i} style={{ borderLeftWidth: 2, borderLeftColor: tint(c.lavender, 0.6), paddingLeft: spacing.md }}>
+                <AppText size={14} color={c.text1} lineHeightMultiple={1.45}>“{t}”</AppText>
+              </View>
+            ))}
+          </View>
+          <AppText size={12} color={c.muted} style={{ marginTop: spacing.md }}>Messages you saved or found helpful — we weave these into your resets when it fits.</AppText>
+        </Card>
+      )}
 
       {/* weekly report — downloadable PDF */}
       <Card style={{ marginTop: spacing.md }}>

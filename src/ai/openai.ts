@@ -33,6 +33,8 @@ export interface ResetHistory {
   completedSteps?: number;
   toolsEngaged?: Record<string, number>;
   lastStep?: { text: string; done: boolean } | null;
+  /** community affirmations that recently resonated with them (saved/reacted) */
+  resonated?: string[];
 }
 
 interface GenerateInput {

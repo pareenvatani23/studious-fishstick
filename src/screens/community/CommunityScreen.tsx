@@ -137,6 +137,7 @@ export function CommunityScreen() {
           <View style={{ marginTop: spacing.md, borderRadius: radius.xl, overflow: 'hidden', borderWidth: c.borderWidth, borderColor: tint(c.lavender, 0.3) }}>
             <LinearGradient colors={[tint(c.lavender, 0.18), tint(c.teal, 0.1)]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ padding: spacing.xl }}>
               <AppText size={20} weight="700" lineHeightMultiple={1.4}>{hero.text}</AppText>
+              {hero.author_label ? <AppText size={12} color={c.muted} style={{ marginTop: spacing.sm }}>— {hero.author_label}</AppText> : null}
               <PostActions post={hero} onReact={() => toggleReact(hero)} onSave={() => toggleSave(hero)} />
             </LinearGradient>
           </View>
@@ -185,6 +186,7 @@ function PostCard({ post, onReact, onSave }: { post: Post; onReact: () => void; 
   return (
     <Card>
       <AppText size={16} lineHeightMultiple={1.5}>{post.text}</AppText>
+      {post.author_label ? <AppText size={12} color={c.muted} style={{ marginTop: 6 }}>— {post.author_label}</AppText> : null}
       <PostActions post={post} onReact={onReact} onSave={onSave} />
     </Card>
   );

@@ -16,6 +16,7 @@ import { situationById } from '../../data/situations';
 import { aiEnabled, voiceEnabled } from '../../ai/config';
 import { generateReset } from '../../ai/openai';
 import { synthesize } from '../../ai/elevenlabs';
+import { fetchRecentResonant } from '../../supabase/community';
 import { radius, spacing } from '../../theme/tokens';
 
 /**
@@ -53,6 +54,7 @@ export function NarrationScreen() {
   const [showNote, setShowNote] = useState(false);
   const soundRef = useRef<Audio.Sound | null>(null);
   const tokenRef = useRef(0); // cancels stale synth requests (prevents double voice)
+  const resonantRef = useRef<string[]>([]); // community affirmations that resonated
   const pulse = useRef(new Animated.Value(0.85)).current;
 
   const recent = {
@@ -163,7 +165,7 @@ export function NarrationScreen() {
           emotions: draft.emotions,
           situations: draft.situations,
           note: draft.note,
-          history: buildHistory(),
+          history: { ...buildHistory(), resonated: resonantRef.current },
           avoidReframes: avoidR,
           avoidSteps: avoidS,
         });
@@ -198,6 +200,7 @@ export function NarrationScreen() {
   useEffect(() => {
     (async () => {
       setLoading(true);
+      try { resonantRef.current = await fetchRecentResonant(2); } catch {}
       const ct = await generate(recent.reframes.slice(0, 6), recent.steps.slice(0, 6));
       if (ct) { apply(ct); setLoading(false); } // play-on-tap: no auto-synth (cost)
     })();

@@ -1,6 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { View, ActivityIndicator } from 'react-native';
 import * as Updates from 'expo-updates';
+
+// Keep the native splash up until our AnimatedSplash paints — no black flicker.
+// Defensive: expo-splash-screen is native; on an older build that lacks it (OTA)
+// this simply no-ops instead of crashing.
+try {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  require('expo-splash-screen').preventAutoHideAsync?.().catch?.(() => {});
+} catch {}
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ThemeProvider } from './src/theme/ThemeContext';
 import { AppStateProvider } from './src/store/AppState';

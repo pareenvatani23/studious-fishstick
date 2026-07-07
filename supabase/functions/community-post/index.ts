@@ -83,8 +83,17 @@ Deno.serve(async (req) => {
   const qc = await qualityCheck(text);
   if (!qc.ok) return json({ status: 'rejected', reason: qc.reason || 'Let’s keep it a genuine, uplifting message for a stranger.' });
 
+  // truncated first name (a few characters) — not full identity
+  let authorLabel = 'A friend';
+  try {
+    const pr = await sb(`profiles?select=name&id=eq.${uid}`);
+    const name = pr.ok ? (await pr.json())[0]?.name : '';
+    const first = String(name ?? '').trim().split(/\s+/)[0] || '';
+    if (first && first.toLowerCase() !== 'there') authorLabel = first.length > 4 ? `${first.slice(0, 4)}…` : first;
+  } catch { /* keep default */ }
+
   const nowIso = new Date().toISOString();
-  const ins = await sb('posts', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ user_id: uid, text, status: 'published', quality_score: qc.score, published_at: nowIso }) });
+  const ins = await sb('posts', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ user_id: uid, text, status: 'published', quality_score: qc.score, published_at: nowIso, author_label: authorLabel }) });
   if (!ins.ok) return json({ error: `insert ${ins.status}` }, 502);
   const row = (await ins.json())[0];
   await sb(`profiles?id=eq.${uid}`, { method: 'PATCH', body: JSON.stringify({ last_post_on: nowIso.slice(0, 10) }) });

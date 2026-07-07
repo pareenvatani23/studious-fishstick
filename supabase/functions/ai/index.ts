@@ -126,7 +126,7 @@ async function generateReset(input: any) {
     input.note ? `The thought underneath: "${input.note}".` : '',
     typeof input.heaviness === 'number' ? `They rated how heavy it feels: ${input.heaviness} of 5. Match your tone to that weight.` : '',
     // Longitudinal "patient history" — use it like a therapist who knows this person; never quote it back verbatim.
-    (h.distortions?.length || h.recentSituations?.length || typeof h.completedSteps === 'number')
+    (h.distortions?.length || h.recentSituations?.length || typeof h.completedSteps === 'number' || h.resonated?.length)
       ? [
           `BACKGROUND (use like a therapist who knows this person's history; do NOT quote it back or say you have records):`,
           h.recentSituations?.length ? `- Recurring situations lately: ${JSON.stringify(h.recentSituations.slice(0, 6))}.` : '',
@@ -136,6 +136,7 @@ async function generateReset(input: any) {
             ? `- Follow-through: they've completed ${h.completedSteps} of their last ${h.suggestedSteps} suggested steps.` : '',
           h.toolsEngaged ? `- Tools they actually engage with: ${JSON.stringify(h.toolsEngaged)} (breathing/grounding/journal counts).` : '',
           h.lastStep ? `- Their most recent suggested step was "${h.lastStep.text}" (${h.lastStep.done ? 'they did it' : 'not done'}).` : '',
+          h.resonated?.length ? `- A community affirmation that recently resonated with them: ${JSON.stringify(h.resonated.slice(0, 2))}. IF (and only if) it is clinically appropriate and genuinely fits this moment, you may gently echo its spirit in the reframe — but stay evidence-based CBT and never force or quote it.` : '',
         ].filter(Boolean).join('\n')
       : '',
     input.avoidReframes?.length ? `Do NOT reuse or paraphrase these earlier reframes: ${JSON.stringify(input.avoidReframes)}.` : '',

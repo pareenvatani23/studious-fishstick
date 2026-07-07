@@ -7,6 +7,7 @@ export interface Post {
   quality_score: number;
   published_at: string | null;
   created_at: string;
+  author_label?: string | null;
   reacted?: boolean;
   saved?: boolean;
 }
@@ -72,7 +73,7 @@ export async function fetchFeed(): Promise<{ hero: Post | null; drop: Post[] }> 
   const since = new Date(Date.now() - 14 * 86400000).toISOString();
   const { data, error } = await supabase
     .from('posts')
-    .select('id,text,helped_count,quality_score,published_at,created_at')
+    .select('id,text,helped_count,quality_score,published_at,created_at,author_label')
     .eq('status', 'published')
     .gte('published_at', since)
     .order('published_at', { ascending: false })
@@ -88,10 +89,31 @@ export async function fetchSaved(): Promise<Post[]> {
   if (!supabase) return [];
   const { data } = await supabase
     .from('post_saves')
-    .select('created_at, posts(id,text,helped_count,quality_score,published_at,created_at)')
+    .select('created_at, posts(id,text,helped_count,quality_score,published_at,created_at,author_label)')
     .order('created_at', { ascending: false });
   const posts = (data ?? []).map((r: any) => r.posts).filter(Boolean);
   return posts.map((p: any) => ({ ...p, saved: true }));
+}
+
+/** The community messages that most recently resonated (saved or reacted-to). */
+export async function fetchRecentResonant(limit = 2): Promise<string[]> {
+  if (!supabase) return [];
+  try {
+    const [{ data: sv }, { data: rc }] = await Promise.all([
+      supabase.from('post_saves').select('created_at, posts(text)').order('created_at', { ascending: false }).limit(limit + 2),
+      supabase.from('post_reactions').select('created_at, posts(text)').order('created_at', { ascending: false }).limit(limit + 2),
+    ]);
+    const items = [...(sv ?? []), ...(rc ?? [])]
+      .map((r: any) => ({ t: r.posts?.text as string, at: r.created_at as string }))
+      .filter((x) => x.t)
+      .sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const i of items) { if (!seen.has(i.t)) { seen.add(i.t); out.push(i.t); } if (out.length >= limit) break; }
+    return out;
+  } catch {
+    return [];
+  }
 }
 
 export async function setReaction(postId: string, on: boolean): Promise<void> {
