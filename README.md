@@ -4,15 +4,36 @@
 
 > Pause. Name the story. Choose a steadier response. Take one small action.
 
-TrueShift is a privacy-first, CBT-informed self-reflection app, built in React
-Native + Expo from the attached design system (`TrueShift.dc.html`). It is
-**not** therapy, not a medical device, and not a crisis service. Local-only MVP:
-no account, no network, no ads, no social feed.
+TrueShift is a privacy-first, **CBT-informed** self-reflection app built in React
+Native + Expo. It is **not** therapy, not a medical device, and not a crisis
+service.
 
-It keeps the design system's 5-theme token system, component primitives,
-navigation shell, onboarding, Explore, Progress, Profile/settings, theme picker,
-crisis resources, delete-data and empty states — but the daily experience has
-been simplified to a clinically-grounded **3-tap Reset** (see below).
+It centres on a short daily **Reset** — name what you're feeling, get a gentle
+research-backed reframe, take one small action — plus a curated CBT lesson
+library, a weekly insights PDF, and an anonymous, AI-gated community of
+one-a-day affirmations.
+
+> **Note:** earlier versions of this app were local-only with no backend. That is
+> **no longer true.** TrueShift now runs on Supabase (auth, Postgres, edge
+> functions, cron) with AI features via OpenAI, and ships over-the-air via EAS
+> Update. For anything architectural, trust the code and the docs below — not
+> older prose.
+
+---
+
+## Documentation map
+
+Deep detail lives in [`CLAUDE.md`](./CLAUDE.md) + [`docs/`](./docs) (kept short
+and task-scoped so you load only what you need):
+
+| Topic | File |
+|---|---|
+| What the app is / product rules / safety guardrails | [`docs/CONCEPT.md`](./docs/CONCEPT.md) |
+| Features and which files own them | [`docs/FEATURES.md`](./docs/FEATURES.md) |
+| Supabase, edge functions, cron, deploy, OTA, scale, secrets | [`docs/INFRA.md`](./docs/INFRA.md) |
+| Known bugs / gotchas / "don't do this again" | [`docs/BUGS.md`](./docs/BUGS.md) |
+| Verification & testing strategy | [`docs/TESTS.md`](./docs/TESTS.md) |
+| AI evaluation (quality gate, moderation, reframe safety) | [`docs/EVALS.md`](./docs/EVALS.md) |
 
 ---
 
@@ -20,13 +41,22 @@ been simplified to a clinically-grounded **3-tap Reset** (see below).
 
 ```bash
 npm install
-npx expo start          # press i (iOS) / a (Android), or scan with Expo Go
+npx expo start          # press a (Android) / i (iOS), or scan with a dev build
 ```
 
-- Typecheck: `npm run typecheck`
-- Bundle check: `npx expo export --platform ios`
+Requires the Expo SDK 51 toolchain (RN 0.74, React 18). Client env vars live in
+`.env` (see `.env.example`) — only the anon/RLS-safe `EXPO_PUBLIC_SUPABASE_*`
+keys ship in the bundle; all AI provider keys stay server-side in edge functions.
 
-Requires the Expo SDK 51 toolchain (RN 0.74, React 18). No backend to run.
+**Before shipping any change** (the non-negotiable gate — see `docs/TESTS.md`):
+
+```bash
+npm run typecheck                                     # tsc --noEmit
+npx expo export --platform android --output-dir /tmp/x   # bundle sanity
+```
+
+Then commit → push `main` → OTA (`eas update --branch preview`) → rebuild an APK
+**only if** native modules or `app.json`/config changed.
 
 ---
 
@@ -35,96 +65,73 @@ Requires the Expo SDK 51 toolchain (RN 0.74, React 18). No backend to run.
 | Concern | Choice |
 |---|---|
 | Framework | React Native + Expo (SDK 51) |
-| Navigation | `@react-navigation` native-stack + bottom-tabs (BlurView tab bar) |
-| Gradients | `expo-linear-gradient` |
-| Read-aloud | `expo-speech` |
-| Storage | `@react-native-async-storage/async-storage` (local-only) |
+| Navigation | `@react-navigation` native-stack + bottom-tabs (6 tabs, BlurView bar) |
+| Backend | **Supabase** — Postgres + RLS, Edge Functions (Deno), Storage, Auth, pg_cron |
+| AI | **OpenAI** — `gpt-4o-mini` (reframe/lessons/quality), moderation, `tts-1` voice |
+| Delivery | EAS Update (OTA, `preview` channel) + periodic Android APK builds |
+| Voice | OpenAI TTS, cached in Storage, played on tap |
 | Icons / mark | `react-native-svg` (custom line-icon set + "settling tide" mark) |
-
-No backend, no account, no network calls in MVP.
 
 ---
 
 ## Project structure
 
 ```
-App.tsx                      Providers: SafeArea → Theme → AppState → ShiftFlow → Navigation
+App.tsx                providers: SafeArea → Auth → AppState → Theme → Lessons → ResetFlow → Nav
 src/
-  theme/
-    tokens.ts                spacing 4·8·12·16·20·24·32 · radius 8·12·16·20·24·full · type scale · text-size steps
-    themes.ts                the 5 themes (Calm Dark default, Low Stimulation, Warm Night, High Contrast, Soft Light)
-    ThemeContext.tsx         Context provider that swaps the token object + text size + reduce motion + read-aloud
-  data/                      ⚠ stubbed clinical content (see CONTENT_STUBS.md)
-    pulls · feelings · responses · actions · reframes · lessons · emotions
-  store/
-    AppState.tsx             onboarding, reset history, derived stats (AsyncStorage)
-    ResetFlow.tsx            in-progress "draft" reset for the daily loop
-  components/                Button · Chip · Input · SelectableCard · VideoLessonCard · ProgressBar ·
-                             Screen/Card · Header · Settings · EmptyState · ReadAloud · AppText · WaveMark · icons
-  navigation/               RootNavigator (onboarding gate) · TabNavigator · types · hooks
-  screens/
-    onboarding/  Splash · Welcome · How it works · Text size · Read aloud · Privacy · Ready
-    home/        Home (one clear action)
-    reset/       StartReset (Reset tab) · Situation · Support · Done   ← the 3-tap loop
-    explore/     Explore · Video Lesson
-    progress/    Progress
-    profile/     Profile · Theme Picker · Crisis · Info (about/terms/privacy) · Delete Data
+  ai/          openai.ts (types + prompts), edge.ts (calls edge functions)
+  components/  primitives — AppText · Button · Screen · SelectableCard · icons · AnimatedSplash …
+  data/        static clinical content (feelings · situations · lessons) — see CONTENT_STUBS.md
+  navigation/  RootNavigator (onboarding + auth gate) · TabNavigator (6 tabs) · types · hooks
+  notifications/ push registration · reminder sync · deep-link routing
+  screens/     auth · onboarding · home · reset · explore · progress · profile · community · tools
+  store/       AppState · ResetFlow · Lessons (Context providers, DB-backed)
+  supabase/    client · auth · sync · community
+  theme/       tokens · themes (6) · ThemeContext
+supabase/
+  functions/   ai · community-post · daily-nudge · generate-lesson · rank-lessons · tts · weekly-report
+  schema*.sql  v1 → v5 (apply in order; v5 = community)
 ```
 
-## The daily Reset (3 taps)
+## The daily Reset
 
-The product is built around one simple, repeatable loop. Plain words, no
-framework to learn — the app does the formulation, the user just taps and reads:
+The product is built around one repeatable loop — the app does the formulation,
+the user just taps and reads:
 
-1. **Situation** — "What happened?" → pick a concrete everyday situation
-   (+ an optional "how heavy does it feel?" check that gently surfaces support
-   when high).
-2. **Support** — one screen, in clinically-safe order: **validate first** → a
-   reframe shown as *"another way to look at it"* (editable) → **one small step**
-   (a concrete implementation intention, swappable). Optional "add the thought".
-3. **Done** — "How'd it go?" → *I did it / Not yet*. No score, no shame.
+1. **Name it** — how heavy it feels + up to 3 feelings + up to 2 situations.
+2. **Reframe** — an AI-generated, gentle, research-backed cognitive reframe (the
+   "core"), history- and adherence-aware, optionally offering ONE tool
+   (breathing / grounding / journal). Narrated on tap.
+3. **Act & close** — one small action, then a supportive peak-end close
+   ("You did it" — animated, rotating messages). No score, no shame.
 
-> Earlier abstract machinery from the original brief — the 10 "emotional pulls",
-> the virtue/"steadier response" step, multi-field journaling, and the Easy/Full
-> split — was removed after a clinical + UX review: it was the weakest part both
-> for evidence-fidelity (real CBT anchors on a *specific situation*, not trait
-> self-labels) and for retention. See `CONTENT_STUBS.md` and commit history.
+See [`docs/CONCEPT.md`](./docs/CONCEPT.md) for the clinical rationale and the
+non-negotiable safety guardrails (crisis handling, ≤2 notifications/day,
+anonymity).
 
-## Themes
+## Beyond the Reset
 
-Five switchable themes live in `src/theme/themes.ts`, each a complete
-`ThemeColors` token object. `ThemeProvider` swaps the active object; **no
-component hard-codes a hex** — they read `useTheme().theme.colors`. Teal =
-action, lavender = reflection. No pure black/white. Accent tints are
-derived at runtime via `tint(hex, alpha)`.
+- **Explore** — CBT lesson library; lessons are AI-generated daily (cron) and
+  personalized in sort order.
+- **Progress / Insights** — consistency, thought/keyword mapping, "what
+  resonated with you" from community, and a downloadable **weekly PDF**.
+- **Community ("Daily Drop")** — post ONE affirmation a day; anonymous;
+  AI-moderated + quality-gated; a finite hero + ~12 ranked feed (never endless);
+  "This helped me" + Save.
 
-## Accessibility
+## Themes & accessibility
 
-- ≥44px tap targets; CTAs 56–60px.
-- Selected state is **border + ✓**, never colour alone (chips, cards, toggles).
-- In-app text size (Normal / Large / Largest) **and** OS Dynamic Type
-  (`allowFontScaling`) both scale text via `AppText`.
-- Reduce Motion honoured (splash glow, start-shift pulse).
-- Read-aloud (`expo-speech`) on text-heavy screens + onboarding.
-- High-contrast theme available; contrast targets ≥4.5:1.
-- Buttons/cards carry explicit `accessibilityLabel` / `accessibilityRole`.
-
-## React Native implementation notes
-
-- `SafeAreaView` + 20px horizontal padding via the `Screen` shell; bottom CTAs
-  respect the home-indicator inset; inputs are keyboard-safe (`KeyboardAvoidingView`).
-- Gradients via `expo-linear-gradient`; the weekly chart is plain Views (no chart lib).
-- Bottom tabs via `@react-navigation/bottom-tabs` with a `BlurView` background.
-- Themes via a Context provider swapping a token object; storage is local-only.
-- App icon & splash = the "settling tide" mark (`assets/`, generated; see
-  `WaveMark`), splash glow honours Reduce Motion.
+Six switchable themes in `src/theme/themes.ts` (Calm Dark default, Warm Sand,
+Soft Light, + Low-Stim / High-Contrast / Warm Night), selectable at first run or
+from Profile. No component hard-codes a hex — all read `useTheme().theme.colors`.
+Accessibility: ≥44px targets, selected = border + ✓ (never colour alone),
+in-app + OS text scaling, Reduce Motion honoured, read-aloud on text-heavy
+screens, high-contrast theme, explicit `accessibilityLabel`/`Role`.
 
 ---
 
 ## ⚠ Content is draft, pending clinician review
 
-The situation/validate/reframe/action copy in `src/data/situations.ts` is
-**draft** — written to clinical guardrails (validate-first, reframe-as-editable-
-hypothesis, implementation-intention actions) so the UX is testable, but **not
-clinician-vetted**. Every entry is `copyFinal: false`. Lesson summaries and legal
-text are likewise placeholders. **See [`CONTENT_STUBS.md`](./CONTENT_STUBS.md).**
+The clinical copy in `src/data/*` is written to CBT guardrails so the UX is
+testable, but is **not clinician-vetted**. Lesson summaries and legal text are
+likewise placeholders. See [`CONTENT_STUBS.md`](./CONTENT_STUBS.md).
