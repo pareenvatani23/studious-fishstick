@@ -12,6 +12,7 @@ export type RootStackParamList = {
   // Onboarding
   Welcome: undefined;
   HowItWorks: undefined;
+  ChooseTheme: undefined;
   TextSize: undefined;
   ReadAloud: undefined;
   Privacy: undefined;

@@ -13,6 +13,7 @@ import { TabNavigator } from './TabNavigator';
 // Onboarding
 import { WelcomeScreen } from '../screens/onboarding/WelcomeScreen';
 import { HowItWorksScreen } from '../screens/onboarding/HowItWorksScreen';
+import { ChooseThemeScreen } from '../screens/onboarding/ChooseThemeScreen';
 import { TextSizeScreen } from '../screens/onboarding/TextSizeScreen';
 import { ReadAloudScreen } from '../screens/onboarding/ReadAloudScreen';
 import { PrivacyScreen } from '../screens/onboarding/PrivacyScreen';
@@ -92,6 +93,7 @@ export function RootNavigator() {
         ) : stage === 'onboarding' ? (
           <Stack.Group>
             <Stack.Screen name="HowItWorks" component={HowItWorksScreen} />
+            <Stack.Screen name="ChooseTheme" component={ChooseThemeScreen} />
             <Stack.Screen name="TextSize" component={TextSizeScreen} />
             <Stack.Screen name="ReadAloud" component={ReadAloudScreen} />
             <Stack.Screen name="Privacy" component={PrivacyScreen} />

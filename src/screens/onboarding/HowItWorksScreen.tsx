@@ -13,7 +13,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'HowItWorks'>;
 
 export function HowItWorksScreen({ navigation }: Props) {
   return (
-    <Screen scroll bottom={<Button label="Got it" onPress={() => navigation.navigate('TextSize')} />}>
+    <Screen scroll bottom={<Button label="Got it" onPress={() => navigation.navigate('ChooseTheme')} />}>
       <View style={{ marginTop: spacing.sm, marginBottom: spacing.xl }}>
         <SegmentedSteps total={3} current={0} />
       </View>

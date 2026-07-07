@@ -10,6 +10,7 @@
 
 export type ThemeName =
   | 'calmDark'
+  | 'warmSand'
   | 'lowStimulation'
   | 'warmNight'
   | 'highContrast'
@@ -87,6 +88,34 @@ export const themes: Record<ThemeName, Theme> = {
       borderWidth: 1,
       onAccent: '#0E1619',
       overlay: 'rgba(5,9,11,0.55)',
+    },
+  },
+
+  warmSand: {
+    name: 'warmSand',
+    label: 'Warm Sand',
+    description: 'Warm, calm daylight',
+    isDark: false,
+    swatch: '#EFE6D6',
+    colors: {
+      // Editorial warm-light palette (sand + sage + soft plum), MindDay-esque.
+      background: '#F5EEE2',
+      card: '#FCF7EE',
+      elevated: '#FFFFFF',
+      soft: '#EDE4D4',
+      teal: '#4E9A86',
+      lavender: '#8B7BB0',
+      success: '#4E9A86',
+      warning: '#C08A4E',
+      danger: '#C56B63',
+      text1: '#332F29',
+      text2: '#7C766C',
+      muted: '#A79E8F',
+      border: 'rgba(60,50,35,0.09)',
+      borderStrong: 'rgba(60,50,35,0.16)',
+      borderWidth: 1,
+      onAccent: '#FCF7EE',
+      overlay: 'rgba(38,32,25,0.4)',
     },
   },
 
@@ -202,8 +231,9 @@ export const themes: Record<ThemeName, Theme> = {
 
 export const themeOrder: ThemeName[] = [
   'calmDark',
-  'lowStimulation',
-  'warmNight',
-  'highContrast',
+  'warmSand',
   'softLight',
+  'warmNight',
+  'lowStimulation',
+  'highContrast',
 ];
