@@ -42,6 +42,8 @@ export function useNotificationRouting() {
           nav.navigate('VideoLesson', { lessonId: String(data.lessonId) });
         } else if (data.type === 'insights') {
           nav.navigate('Main', { screen: 'ProgressTab' });
+        } else if (data.type === 'community') {
+          nav.navigate('Main', { screen: 'CommunityTab' });
         }
       } catch {
         // navigating to a screen not in the current stack — ignore

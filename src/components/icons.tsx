@@ -21,7 +21,7 @@ export type IconName =
   | 'cloud' | 'grid' | 'circleDashed' | 'flag'
   | 'flame' | 'sun' | 'lines' | 'search'
   | 'faceWorried' | 'faceSad' | 'faceAngry' | 'faceTired'
-  | 'breathe' | 'target' | 'bell';
+  | 'breathe' | 'target' | 'bell' | 'bookmark' | 'people';
 
 interface IconProps {
   name: IconName;
@@ -111,6 +111,10 @@ export function Icon({ name, size = 24, color, strokeWidth = 1.8 }: IconProps) {
         return <><Path {...p} d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" /><Circle {...p} cx={12} cy={12} r={3} /></>;
       case 'bell':
         return <><Path {...p} d="M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6z" /><Path {...p} d="M10.5 20a1.8 1.8 0 0 0 3 0" /></>;
+      case 'bookmark':
+        return <Path {...p} d="M6 4h12v16l-6-4-6 4z" />;
+      case 'people':
+        return <><Circle {...p} cx={9} cy={8} r={3.2} /><Path {...p} d="M3.5 19a5.5 5.5 0 0 1 11 0" /><Path {...p} d="M16 5.2a3.2 3.2 0 0 1 0 5.6" /><Path {...p} d="M17.5 13.5a5.5 5.5 0 0 1 3 5" /></>;
       case 'faceWorried':
         return <G><Circle {...p} cx={12} cy={12} r={9} /><Path {...p} d="M8 15c1-1.5 2.5-2 4-2s3 .5 4 2" />{dot(9, 9, color)}{dot(15, 9, color)}</G>;
       case 'faceSad':

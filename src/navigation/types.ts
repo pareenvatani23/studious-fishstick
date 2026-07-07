@@ -4,6 +4,7 @@ export type TabParamList = {
   HomeTab: undefined;
   ResetTab: undefined;
   ExploreTab: undefined;
+  CommunityTab: undefined;
   ProgressTab: undefined;
   YouTab: undefined;
 };

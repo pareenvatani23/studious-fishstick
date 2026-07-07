@@ -50,6 +50,7 @@ async function buildPlan(p: any, lp: any, resets7: any[], resetToday: boolean): 
     toughness: heavies >= 2 || avgHeavy >= 3.5 ? 'high' : total >= 3 ? 'medium' : 'low',
     sendReset: heavies >= 2 || avgHeavy >= 3.5 ? !resetToday : isWeekend ? true : total < 2 && !resetToday,
     sendLesson: heavies >= 2 || total >= 4,
+    sendCommunity: isWeekend, // sparse invite to share a kind thought
     note: total >= 8
       ? 'You’ve shown up often — that regularity is where change compounds. Keep the rhythm.'
       : total >= 3
@@ -69,8 +70,9 @@ async function buildPlan(p: any, lp: any, resets7: any[], resetToday: boolean): 
       `- If the week looks TOUGH (high heaviness / many hard days), offer more support: a reset reminder and often a lesson.`,
       `- If the week looks CALM and they're consistent, be sparse — prefer only a gentle weekend-morning reset, few or no lessons.`,
       `- Don't send a reset reminder if they've already reset today.`,
+      `- "sendCommunity": a few times a week, gently invite them to share one positive thought to the community (never combined so total stays small).`,
       `- The "note" is a short, warm in-app message about staying regular with resets AND lessons for best results (1-2 sentences, plain, no emojis).`,
-      `Return minified JSON: {"toughness":"low|medium|high","sendReset":true|false,"sendLesson":true|false,"note":"..."}`,
+      `Return minified JSON: {"toughness":"low|medium|high","sendReset":true|false,"sendLesson":true|false,"sendCommunity":true|false,"note":"..."}`,
     ].filter(Boolean).join('\n');
     const res = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST', headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
@@ -83,6 +85,7 @@ async function buildPlan(p: any, lp: any, resets7: any[], resetToday: boolean): 
       // guarantee support on genuinely hard weeks; never nudge if already reset today
       sendReset: (!!d.sendReset || hardWeek) && !resetToday,
       sendLesson: !!d.sendLesson || hardWeek,
+      sendCommunity: !!d.sendCommunity,
       note: (typeof d.note === 'string' && d.note.trim()) ? d.note.trim().slice(0, 240) : fallback.note,
     };
   } catch {
@@ -124,7 +127,7 @@ Deno.serve(async (req) => {
 
   const now = new Date();
   const weekAgo = new Date(now.getTime() - 7 * 86400000).toISOString();
-  const res = await sb(`profiles?select=id,name,expo_push_token,reminder_hour,timezone,plan,plan_date,push_last_sent_on,last_lesson_push_on,lessons_watched&reminder_enabled=eq.true&expo_push_token=not.is.null`);
+  const res = await sb(`profiles?select=id,name,expo_push_token,reminder_hour,timezone,plan,plan_date,push_last_sent_on,last_lesson_push_on,last_post_on,lessons_watched&reminder_enabled=eq.true&expo_push_token=not.is.null`);
   if (!res.ok) return json({ error: `profiles ${res.status}` }, 502);
   const profiles: any[] = await res.json();
 
@@ -160,11 +163,17 @@ Deno.serve(async (req) => {
       pushes.push({ to: p.expo_push_token, title: msg.title, body: msg.body, sound: 'default', channelId: 'reminders', data: { type: 'reset' } });
       addPatch(p.id, { push_last_sent_on: localDate });
     }
-    if (lessonDue && plan.sendLesson && p.last_lesson_push_on !== localDate) {
-      const lesson = await pickLesson(Array.isArray(p.lessons_watched) ? p.lessons_watched : []);
-      if (lesson) {
-        pushes.push({ to: p.expo_push_token, title: 'A lesson that might help', body: lesson.title, sound: 'default', channelId: 'reminders', data: { type: 'lesson', lessonId: lesson.id } });
+    // Midday slot: at most ONE of {community, lesson} per day (keeps total <=2/day).
+    if (lessonDue && p.last_lesson_push_on !== localDate) {
+      if (plan.sendCommunity && p.last_post_on !== localDate) {
+        pushes.push({ to: p.expo_push_token, title: 'Change someone’s day', body: 'You can help, save or change a life with one beautiful thought or affirmation. Share one?', sound: 'default', channelId: 'reminders', data: { type: 'community' } });
         addPatch(p.id, { last_lesson_push_on: localDate });
+      } else if (plan.sendLesson) {
+        const lesson = await pickLesson(Array.isArray(p.lessons_watched) ? p.lessons_watched : []);
+        if (lesson) {
+          pushes.push({ to: p.expo_push_token, title: 'A lesson that might help', body: lesson.title, sound: 'default', channelId: 'reminders', data: { type: 'lesson', lessonId: lesson.id } });
+          addPatch(p.id, { last_lesson_push_on: localDate });
+        }
       }
     }
   }
