@@ -38,7 +38,10 @@ test('Home → Tools hub navigation works', async ({ page }) => {
 
   await page.getByRole('button', { name: /see all/i }).first().click();
   await expect(page.getByText(/calm tools/i)).toBeVisible();
-  // The full library of tools is present (proves the catalog + hub render).
-  await expect(page.getByText('Breathe', { exact: true }).first()).toBeVisible();
-  await expect(page.getByText('Ground', { exact: true }).first()).toBeVisible();
+  // Tool cards present (proves the catalog + hub render). getByRole matches the
+  // accessibility tree, which excludes the Home screen still mounted-but-hidden
+  // underneath — so these resolve to the visible hub cards, by their aria-labels
+  // ("Breathe: Box · 4-7-8", "Ground: 5-4-3-2-1 senses").
+  await expect(page.getByRole('button', { name: /^Breathe:/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Ground:/ })).toBeVisible();
 });
