@@ -1,14 +1,28 @@
 import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system';
-import { invokeTTS } from './edge';
+import { invokeTTS, TTSOptions } from './edge';
 
 /**
- * Voice narration via the `tts` edge function (ElevenLabs key lives server-side).
+ * Warm, human "therapist voice" for the reset narration. gpt-4o-mini-tts takes
+ * tone instructions, so the read feels compassionate and unhurried rather than
+ * a flat text-to-speech. Shared lesson audio keeps the cheaper tts-1 default.
+ */
+export const RESET_VOICE: TTSOptions = {
+  model: 'gpt-4o-mini-tts',
+  voice: 'sage',
+  instructions:
+    'You are a warm, caring CBT therapist speaking gently to someone you know well. ' +
+    'Read with genuine compassion and calm — soft, unhurried, reassuring. Let the pace ' +
+    'breathe, with natural pauses. Sound human and present, never robotic or clinical.',
+};
+
+/**
+ * Voice narration via the `tts` edge function (OpenAI key lives server-side).
  * Returns a playable URI: on native we write the mp3 to the cache dir; on web we
  * return an object URL.
  */
-export async function synthesize(text: string): Promise<string> {
-  const buf = await invokeTTS(text);
+export async function synthesize(text: string, opts?: TTSOptions): Promise<string> {
+  const buf = await invokeTTS(text, opts);
 
   if (Platform.OS === 'web') {
     const blob = new Blob([buf], { type: 'audio/mpeg' });

@@ -31,6 +31,18 @@ async function sb(path: string, init?: RequestInit) {
   return fetch(`${SB_URL}/rest/v1/${path}`, { ...init, headers: { apikey: SVC, Authorization: `Bearer ${SVC}`, 'Content-Type': 'application/json', ...(init?.headers ?? {}) } });
 }
 const CRISIS_RE = /\b(kill myself|killing myself|end my life|ending my life|suicid|take my (own )?life|want to die|don'?t want to (live|be alive)|better off dead|self[-\s]?harm|hurt myself|cutting myself|overdose)\b/i;
+
+const FALLBACK_HANDLES = ['Aria', 'Milo', 'Noor', 'Kai', 'Sana', 'Leo', 'Maya', 'Ravi', 'Elin', 'Theo', 'Zara', 'Finn'];
+const cap = (s: string) => (s ? s[0].toUpperCase() + s.slice(1).toLowerCase() : '');
+/** "Pareen Vatani" -> "Parvat"; single name -> first 6 chars; blank -> stable fallback from uid. */
+function handleFromName(name: string, uid: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) return cap(parts[0].slice(0, 3)) + parts[parts.length - 1].slice(0, 3).toLowerCase();
+  if (parts.length === 1 && parts[0].toLowerCase() !== 'there') return cap(parts[0].slice(0, 6));
+  let sum = 0;
+  for (let i = 0; i < uid.length; i++) sum = (sum + uid.charCodeAt(i)) % FALLBACK_HANDLES.length;
+  return FALLBACK_HANDLES[sum];
+}
 async function moderationFlagged(text: string): Promise<boolean> {
   try {
     const res = await fetch('https://api.openai.com/v1/moderations', { method: 'POST', headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ model: 'omni-moderation-latest', input: text }) });
@@ -83,13 +95,14 @@ Deno.serve(async (req) => {
   const qc = await qualityCheck(text);
   if (!qc.ok) return json({ status: 'rejected', reason: qc.reason || 'Let’s keep it a genuine, uplifting message for a stranger.' });
 
-  // truncated first name (a few characters) — not full identity
-  let authorLabel = 'A friend';
+  // A real-feeling but partial handle: first few letters of first + last name
+  // joined (e.g. "Pareen Vatani" -> "Parvat"). Keeps a human feel without full identity.
+  let authorLabel = 'Friend';
   try {
     const pr = await sb(`profiles?select=name&id=eq.${uid}`);
     const name = pr.ok ? (await pr.json())[0]?.name : '';
-    const first = String(name ?? '').trim().split(/\s+/)[0] || '';
-    if (first && first.toLowerCase() !== 'there') authorLabel = first.length > 4 ? `${first.slice(0, 4)}…` : first;
+    const h = handleFromName(String(name ?? ''), uid);
+    if (h) authorLabel = h;
   } catch { /* keep default */ }
 
   const nowIso = new Date().toISOString();

@@ -113,6 +113,7 @@ async function generateReset(input: any) {
   const emotions: string[] = Array.isArray(input.emotions) && input.emotions.length ? input.emotions : (input.emotion ? [input.emotion] : []);
   const situationsList: string[] = Array.isArray(input.situations) && input.situations.length ? input.situations : (input.situationLabel ? [input.situationLabel] : []);
   const h = input.history ?? {};
+  const ctx = input.context ?? {};
 
   const userText = [input.customSituation, input.note, ...situationsList].filter(Boolean).join(' ');
   if (localCrisisCheck(userText)) return crisisResult();
@@ -125,6 +126,10 @@ async function generateReset(input: any) {
     emotions.length ? `They named these feelings: ${emotions.join(', ')}. Acknowledge them by name in the validation.` : '',
     input.note ? `The thought underneath: "${input.note}".` : '',
     typeof input.heaviness === 'number' ? `They rated how heavy it feels: ${input.heaviness} of 5. Match your tone to that weight.` : '',
+    // Right-now context — anchor the step to the real time/place, never a mismatched one.
+    (ctx.weekday || ctx.clock || ctx.partOfDay)
+      ? `RIGHT NOW for the user it is ${[ctx.weekday, ctx.clock].filter(Boolean).join(' ')}${ctx.partOfDay ? ` (${ctx.partOfDay})` : ''}${ctx.isWeekend ? ', a weekend' : ''}. Make the small step realistic for THIS time and place: do NOT say "tonight", "before bed", or "tomorrow morning" if it is currently morning or midday; do NOT suggest a morning routine at night. Anchor the when/where to what they can actually do around now. Let the time of day gently colour the tone too (unhurried in the evening, a fresh start in the morning).`
+      : '',
     // Longitudinal "patient history" — use it like a therapist who knows this person; never quote it back verbatim.
     (h.distortions?.length || h.recentSituations?.length || typeof h.completedSteps === 'number' || h.resonated?.length)
       ? [
@@ -146,22 +151,23 @@ async function generateReset(input: any) {
     `- "validate" must be SPECIFIC to this exact moment and varied. NEVER use formulaic openers like "It's normal", "It makes sense", "It's okay", "Many people", "A lot of people", "That's understandable". Reflect back the specific tension in their words instead.`,
     `- "reframe" is a fuller cognitive restructuring — 3 to 4 sentences: (1) name the thinking trap gently, (2) offer the balanced alternative thought, (3) give a brief reason it holds up (evidence for/against, grounded in THEIR situation). Do NOT begin with "Another way", "Maybe", "Perhaps", or "Try to". Warm, plain, concrete.`,
     `- If a thinking pattern from BACKGROUND clearly recurs here, gently connect this moment to that pattern and BUILD on prior work (progress, not repetition) — without sounding like you're reciting a file.`,
-    `- "smallStep": vary the TYPE across CBT techniques — behavioural experiment, opposite action, urge-surf/delay, values-based action, grounding, self-compassion, reaching out, problem-solving, breathing, or journaling — pick what best fits. When it fits, PREFER a technique the user actually follows through on (see BACKGROUND follow-through/tools). Always concrete, with a when/where and a tiny time.`,
+    `- "smallStep": vary the TYPE across CBT techniques — behavioural experiment, opposite action, urge-surf/delay, values-based action, grounding, self-compassion, reaching out, problem-solving, breathing, or journaling — pick what best fits. When it fits, PREFER a technique the user actually follows through on (see BACKGROUND follow-through/tools). Always concrete, with a when/where and a tiny time that fits RIGHT NOW.`,
     `- Set "tool" to the in-app tool that best supports the smallStep: "breathing" (paced/box/4-7-8 breathing), "grounding" (5-4-3-2-1 senses), "journal" (writing a thought/worry down), or "none" (step needs no in-app tool, e.g. texting a friend). If "breathing", set "toolVariant" to "box", "478", or "paced"; otherwise leave "toolVariant" empty. The smallStep wording must match the chosen tool.`,
+    `- "narration" is the SPOKEN version, read aloud to the user in a warm therapist's voice — this matters most. It is NOT a summary of the text above; it is a gentle, human, compassionate mini-session (about 6-9 sentences). Speak directly to them as "you". Open by genuinely meeting them where they are (name the feeling and the specific moment), like someone who knows them and remembers what they've been carrying lately. Then softly offer the reframe as a shift in perspective, in your own warmer spoken words. Then invite the one small step as something kind they can do for themselves right now. Use natural spoken rhythm — short sentences, gentle pauses with commas and ellipses, breathing room. Be tender and unhurried, never clinical, never a checklist. If their history shows a recurring pattern or real progress, acknowledge it warmly ("I've noticed you keep coming back to this, and that takes courage"). End with one quiet, reassuring line. No emojis, no headings, no stage directions.`,
     `- Vary phrasing each time; do not sound templated.`,
     `Return minified JSON with exactly these keys:`,
     `{"crisis":false,`,
     `"validate":"one specific, warm validating sentence, no clichés (<=140 chars)",`,
     `"reframe":"3-4 sentence balanced cognitive reframe with a brief supporting reason, no boilerplate prefix (<=520 chars)",`,
     `"smallStep":"one concrete action (varied CBT technique) with a when/where and a tiny time (<=140 chars)",`,
-    `"narration":"a calm 3-5 sentence spoken script weaving the validation, the reframe, and the step naturally (<=520 chars)",`,
+    `"narration":"a warm, human, spoken 6-9 sentence compassionate script as described above, natural speech rhythm (<=900 chars)",`,
     `"keywords":["2-4 short lowercase thought tags, e.g. 'mind-reading','self-criticism'"],`,
     `"distortion":"one plain-language thinking pattern name, or empty string",`,
     `"tool":"breathing|grounding|journal|none",`,
     `"toolVariant":"box|478|paced|"}`,
   ].filter(Boolean).join('\n');
 
-  const data = await chatJSON(prompt);
+  const data = await chatJSON(prompt, 0.8, 1200); // roomier: the spoken narration is longer now
   const tool = ['breathing', 'grounding', 'journal', 'none'].includes(data.tool) ? data.tool : 'none';
   const out = {
     crisis: Boolean(data.crisis),

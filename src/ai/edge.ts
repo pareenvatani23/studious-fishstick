@@ -66,8 +66,10 @@ export async function rankLessons(
   }
 }
 
+export interface TTSOptions { voice?: string; model?: string; instructions?: string }
+
 /** Call the `tts` edge function and return raw mp3 bytes. Throws on failure. */
-export async function invokeTTS(text: string): Promise<ArrayBuffer> {
+export async function invokeTTS(text: string, opts: TTSOptions = {}): Promise<ArrayBuffer> {
   const token = await accessToken();
   if (!token) throw new Error('Not signed in');
   const ctrl = new AbortController();
@@ -81,7 +83,7 @@ export async function invokeTTS(text: string): Promise<ArrayBuffer> {
         apikey: SUPABASE_ANON_KEY,
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ text }),
+      body: JSON.stringify({ text, ...opts }),
     });
     if (!res.ok) {
       let msg = `tts ${res.status}`;

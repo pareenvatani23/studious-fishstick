@@ -15,7 +15,7 @@ import { useRootNav } from '../../navigation/hooks';
 import { situationById } from '../../data/situations';
 import { aiEnabled, voiceEnabled } from '../../ai/config';
 import { generateReset } from '../../ai/openai';
-import { synthesize } from '../../ai/elevenlabs';
+import { synthesize, RESET_VOICE } from '../../ai/elevenlabs';
 import { fetchRecentResonant } from '../../supabase/community';
 import { radius, spacing } from '../../theme/tokens';
 
@@ -60,6 +60,19 @@ export function NarrationScreen() {
   const recent = {
     reframes: resets.map((r) => r.reframe).filter(Boolean) as string[],
     steps: resets.map((r) => r.actionText).filter(Boolean) as string[],
+  };
+
+  // The user's real "right now" so the step/tone fits the actual time & day.
+  const nowContext = () => {
+    const d = new Date();
+    const hr = d.getHours();
+    const partOfDay = hr < 5 ? 'late night' : hr < 12 ? 'morning' : hr < 17 ? 'afternoon' : hr < 21 ? 'evening' : 'night';
+    return {
+      clock: d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
+      weekday: d.toLocaleDateString([], { weekday: 'long' }),
+      partOfDay,
+      isWeekend: d.getDay() === 0 || d.getDay() === 6,
+    };
   };
 
   // Compact "patient history" the reframe conditions on (patterns + adherence).
@@ -118,7 +131,7 @@ export function NarrationScreen() {
     try {
       if (voiceEnabled) {
         await Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
-        const uri = await synthesize(text);
+        const uri = await synthesize(text, RESET_VOICE);
         if (token !== tokenRef.current) return; // superseded
         const { sound } = await Audio.Sound.createAsync({ uri }, { shouldPlay: true });
         if (token !== tokenRef.current) { try { await sound.unloadAsync(); } catch {} return; }
@@ -166,6 +179,7 @@ export function NarrationScreen() {
           situations: draft.situations,
           note: draft.note,
           history: { ...buildHistory(), resonated: resonantRef.current },
+          context: nowContext(),
           avoidReframes: avoidR,
           avoidSteps: avoidS,
         });

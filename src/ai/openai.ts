@@ -46,9 +46,18 @@ interface GenerateInput {
   situations?: string[];
   note?: string;
   history?: ResetHistory;
+  context?: ResetContext;
   avoidReframes?: string[];
   avoidSteps?: string[];
   avoidValidations?: string[];
+}
+
+/** The user's local "right now", so the step & tone fit the actual moment. */
+export interface ResetContext {
+  clock?: string;
+  weekday?: string;
+  partOfDay?: string;
+  isWeekend?: boolean;
 }
 
 function crisisResult(): AIReset {

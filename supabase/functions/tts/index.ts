@@ -14,6 +14,10 @@ const SB_URL = Deno.env.get('SUPABASE_URL') ?? '';
 const SVC = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 const MAX_CHARS = 2500;
 const CACHE_BUCKET = 'tts-cache';
+// Models the client may request. gpt-4o-mini-tts takes a free-text `instructions`
+// field to steer tone/emotion (used for the warm, human reset narration).
+const ALLOWED_MODELS = new Set(['tts-1', 'tts-1-hd', 'gpt-4o-mini-tts']);
+const ALLOWED_VOICES = new Set(['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer', 'sage', 'coral', 'ballad']);
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -67,10 +71,13 @@ Deno.serve(async (req) => {
   let body: any;
   try { body = await req.json(); } catch { return err('Invalid JSON', 400); }
   const text = String(body?.text ?? '').slice(0, MAX_CHARS).trim();
-  const voice = String(body?.voice ?? TTS_VOICE);
+  const voice = ALLOWED_VOICES.has(String(body?.voice)) ? String(body.voice) : TTS_VOICE;
+  const model = ALLOWED_MODELS.has(String(body?.model)) ? String(body.model) : TTS_MODEL;
+  const instructions = model === 'gpt-4o-mini-tts' ? String(body?.instructions ?? '').slice(0, 600) : '';
   if (!text) return err('Missing text', 400);
 
-  const hash = await sha256Hex(`${TTS_MODEL}:${voice}:${text}`);
+  // cache key must include everything that changes the audio (model, voice, tone)
+  const hash = await sha256Hex(`${model}:${voice}:${instructions}:${text}`);
   const path = `${hash}.mp3`;
 
   // cache hit → serve stored audio
@@ -80,12 +87,24 @@ Deno.serve(async (req) => {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 20000);
   try {
-    const res = await fetch('https://api.openai.com/v1/audio/speech', {
-      method: 'POST',
-      signal: ctrl.signal,
-      headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: TTS_MODEL, voice, input: text, response_format: 'mp3' }),
-    });
+    const speak = (m: string, v: string, ins: string) => {
+      const payload: Record<string, unknown> = { model: m, voice: v, input: text, response_format: 'mp3' };
+      if (ins && m === 'gpt-4o-mini-tts') payload.instructions = ins;
+      return fetch('https://api.openai.com/v1/audio/speech', {
+        method: 'POST',
+        signal: ctrl.signal,
+        headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+    };
+
+    let res = await speak(model, voice, instructions);
+    // Graceful degrade: if a richer model/voice isn't available, still return a
+    // warm OpenAI voice (tts-1/shimmer) rather than dropping to device speech.
+    if (!res.ok && model !== 'tts-1') {
+      const fallbackVoice = ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'].includes(voice) ? voice : 'shimmer';
+      res = await speak('tts-1', fallbackVoice, '');
+    }
     if (!res.ok) {
       const detail = await res.text();
       return err(`OpenAI TTS ${res.status}: ${detail.slice(0, 160)}`, 502);
