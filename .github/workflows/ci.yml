@@ -28,9 +28,44 @@ jobs:
       - name: Bundle (Metro export — catches runtime resolution errors)
         run: npx expo export --platform ios --output-dir /tmp/ts-export
 
+  e2e:
+    name: E2E UI (Playwright web)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Export web build
+        # Public anon keys (safe to expose). If unset, the app boots to its shell
+        # and the smoke test still validates it renders — no secrets required.
+        env:
+          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+          EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+        run: npx expo export --platform web --output-dir web-build
+      - name: Run Playwright tests
+        # Optional: set E2E_EMAIL / E2E_PASSWORD secrets (a confirmed test account)
+        # to enable the deeper authenticated journey; it self-skips otherwise.
+        env:
+          E2E_EMAIL: ${{ secrets.E2E_EMAIL }}
+          E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+        run: npx playwright test
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+
   deploy:
     name: EAS Update (preview channel)
-    needs: verify
+    needs: [verify, e2e]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:

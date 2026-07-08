@@ -9,3 +9,7 @@ web-build/
 .env.local
 ios/
 android/
+"web-build"
+"test-results"
+"playwright-report"
+".playwright"
