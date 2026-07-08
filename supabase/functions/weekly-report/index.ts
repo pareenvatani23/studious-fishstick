@@ -18,6 +18,53 @@ const CRON_SECRET = Deno.env.get('CRON_SECRET') ?? '';
 const SB_URL = Deno.env.get('SUPABASE_URL') ?? '';
 const SVC = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 
+// ── Observability + resilience (structured logs for Supabase log explorer) ───
+const FN = 'weekly-report';
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+function logErr(where: string, err: unknown, extra: Record<string, unknown> = {}) {
+  const e = err as any;
+  console.error(JSON.stringify({
+    level: 'error', fn: FN, where,
+    error: String(e?.message ?? e),
+    stack: e?.stack ? String(e.stack).split('\n').slice(0, 5).join(' | ') : undefined,
+    ...extra,
+  }));
+}
+function logWarn(where: string, msg: string, extra: Record<string, unknown> = {}) {
+  console.warn(JSON.stringify({ level: 'warn', fn: FN, where, msg, ...extra }));
+}
+function backoffMs(attempt: number, retryAfterSec: number | null): number {
+  if (retryAfterSec && retryAfterSec > 0) return Math.min(15000, retryAfterSec * 1000);
+  return Math.min(8000, 400 * 2 ** attempt) + Math.floor(Math.random() * 250);
+}
+/**
+ * fetch() with retry+exponential backoff on 429 / 5xx (OpenAI rate limits &
+ * transient errors). Honors Retry-After. Each attempt has its own timeout.
+ * Returns the last Response (never throws for HTTP status); throws only if the
+ * network call itself fails on the final attempt.
+ */
+async function fetchRetry(url: string, init: RequestInit, where: string, tries = 3, timeoutMs = 20000): Promise<Response> {
+  let last: Response | null = null;
+  for (let attempt = 0; attempt < tries; attempt++) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+    try {
+      const res = await fetch(url, { ...init, signal: ctrl.signal });
+      clearTimeout(timer);
+      if (res.ok || (res.status !== 429 && res.status < 500)) return res;
+      last = res;
+      logWarn(`${where}.retry`, `upstream ${res.status}`, { attempt: attempt + 1, status: res.status });
+      if (attempt < tries - 1) await sleep(backoffMs(attempt, Number(res.headers.get('retry-after')) || null));
+    } catch (e) {
+      clearTimeout(timer);
+      logErr(`${where}.network`, e, { attempt: attempt + 1 });
+      if (attempt === tries - 1) throw e;
+      await sleep(backoffMs(attempt, null));
+    }
+  }
+  return last as Response;
+}
+
 const TEAL = rgb(0.455, 0.780, 0.722);
 const LAV = rgb(0.663, 0.608, 0.831);
 const INK = rgb(0.09, 0.12, 0.13);
@@ -94,14 +141,15 @@ async function aiSummary(name: string, agg: any): Promise<string> {
       agg.distortions.length ? `Thinking patterns: ${JSON.stringify(agg.distortions.map((s: any) => s[0]))}.` : '',
       `Encouraging, specific, non-clinical, no toxic positivity, no emojis. Return minified JSON {"summary":""}.`,
     ].filter(Boolean).join('\n');
-    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    const res = await fetchRetry('https://api.openai.com/v1/chat/completions', {
       method: 'POST', headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ model: OPENAI_MODEL, temperature: 0.7, max_tokens: 220, response_format: { type: 'json_object' }, messages: [{ role: 'system', content: 'Warm CBT reflection writer. Output ONLY minified JSON.' }, { role: 'user', content: prompt }] }),
-    });
-    if (!res.ok) return fallback;
+    }, 'chat');
+    if (!res.ok) { logErr('aiSummary', new Error(`OpenAI ${res.status}`), { status: res.status }); return fallback; }
     const s = JSON.parse((await res.json()).choices[0].message.content).summary;
     return (typeof s === 'string' && s.trim()) ? s.trim() : fallback;
-  } catch {
+  } catch (e) {
+    logErr('aiSummary', e);
     return fallback;
   }
 }
@@ -254,7 +302,7 @@ async function uploadPdf(uid: string, fileName: string, pdf: Uint8Array): Promis
     headers: { apikey: SVC, Authorization: `Bearer ${SVC}`, 'Content-Type': 'application/pdf', 'x-upsert': 'true' },
     body: pdf,
   });
-  if (!res.ok) throw new Error(`upload ${res.status}: ${(await res.text()).slice(0, 150)}`);
+  if (!res.ok) { logErr('uploadPdf', new Error(`upload ${res.status}`), { status: res.status }); throw new Error(`upload ${res.status}: ${(await res.text()).slice(0, 150)}`); }
   return path;
 }
 
@@ -296,12 +344,12 @@ async function processUser(p: any, since: string, opts: { store: boolean; sendPu
   let pushed = false;
   if (opts.sendPush && p.expo_push_token) {
     try {
-      const pr = await fetch('https://exp.host/--/api/v2/push/send', {
+      const pr = await fetchRetry('https://exp.host/--/api/v2/push/send', {
         method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify([{ to: p.expo_push_token, title: 'Your weekly reflection is ready', body: summary.slice(0, 110), sound: 'default', channelId: 'reminders', data: { type: 'insights' } }]),
-      });
+      }, 'push');
       pushed = pr.ok;
-    } catch {}
+    } catch (e) { logErr('push', e, { id: p.id }); }
   }
 
   const out: any = { id: p.id, resets: resets.length, path, pushed, summary };
@@ -345,7 +393,7 @@ Deno.serve(async (req) => {
   const results = [];
   for (const p of profiles) {
     try { results.push(await processUser(p, since, { store: !debug, sendPush: !debug, returnPdf: debug })); }
-    catch (e) { results.push({ id: p.id, error: String((e as Error)?.message ?? e) }); }
+    catch (e) { logErr('processUser', e, { id: p.id }); results.push({ id: p.id, error: String((e as Error)?.message ?? e) }); }
   }
   return json({ ok: true, users: profiles.length, results });
 });

@@ -19,6 +19,53 @@ const CACHE_BUCKET = 'tts-cache';
 const ALLOWED_MODELS = new Set(['tts-1', 'tts-1-hd', 'gpt-4o-mini-tts']);
 const ALLOWED_VOICES = new Set(['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer', 'sage', 'coral', 'ballad']);
 
+// ── Observability + resilience (structured logs for Supabase log explorer) ───
+const FN = 'tts';
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+function logErr(where: string, err: unknown, extra: Record<string, unknown> = {}) {
+  const e = err as any;
+  console.error(JSON.stringify({
+    level: 'error', fn: FN, where,
+    error: String(e?.message ?? e),
+    stack: e?.stack ? String(e.stack).split('\n').slice(0, 5).join(' | ') : undefined,
+    ...extra,
+  }));
+}
+function logWarn(where: string, msg: string, extra: Record<string, unknown> = {}) {
+  console.warn(JSON.stringify({ level: 'warn', fn: FN, where, msg, ...extra }));
+}
+function backoffMs(attempt: number, retryAfterSec: number | null): number {
+  if (retryAfterSec && retryAfterSec > 0) return Math.min(15000, retryAfterSec * 1000);
+  return Math.min(8000, 400 * 2 ** attempt) + Math.floor(Math.random() * 250);
+}
+/**
+ * fetch() with retry+exponential backoff on 429 / 5xx (OpenAI rate limits &
+ * transient errors). Honors Retry-After. Each attempt has its own timeout.
+ * Returns the last Response (never throws for HTTP status); throws only if the
+ * network call itself fails on the final attempt.
+ */
+async function fetchRetry(url: string, init: RequestInit, where: string, tries = 3, timeoutMs = 20000): Promise<Response> {
+  let last: Response | null = null;
+  for (let attempt = 0; attempt < tries; attempt++) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+    try {
+      const res = await fetch(url, { ...init, signal: ctrl.signal });
+      clearTimeout(timer);
+      if (res.ok || (res.status !== 429 && res.status < 500)) return res;
+      last = res;
+      logWarn(`${where}.retry`, `upstream ${res.status}`, { attempt: attempt + 1, status: res.status });
+      if (attempt < tries - 1) await sleep(backoffMs(attempt, Number(res.headers.get('retry-after')) || null));
+    } catch (e) {
+      clearTimeout(timer);
+      logErr(`${where}.network`, e, { attempt: attempt + 1 });
+      if (attempt === tries - 1) throw e;
+      await sleep(backoffMs(attempt, null));
+    }
+  }
+  return last as Response;
+}
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -84,18 +131,15 @@ Deno.serve(async (req) => {
   const cached = await cacheGet(path);
   if (cached) return audioResponse(cached, 'HIT');
 
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 20000);
   try {
     const speak = (m: string, v: string, ins: string) => {
       const payload: Record<string, unknown> = { model: m, voice: v, input: text, response_format: 'mp3' };
       if (ins && m === 'gpt-4o-mini-tts') payload.instructions = ins;
-      return fetch('https://api.openai.com/v1/audio/speech', {
+      return fetchRetry('https://api.openai.com/v1/audio/speech', {
         method: 'POST',
-        signal: ctrl.signal,
         headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
-      });
+      }, 'tts');
     };
 
     let res = await speak(model, voice, instructions);
@@ -107,14 +151,14 @@ Deno.serve(async (req) => {
     }
     if (!res.ok) {
       const detail = await res.text();
+      logErr('tts.upstream', new Error(`OpenAI TTS ${res.status}`), { status: res.status });
       return err(`OpenAI TTS ${res.status}: ${detail.slice(0, 160)}`, 502);
     }
     const audio = await res.arrayBuffer();
     await cachePut(path, audio); // store for reuse (shared text dedupes across users)
     return audioResponse(audio, 'MISS');
   } catch (e) {
+    logErr('handler', e);
     return err(String((e as Error)?.message ?? e), 502);
-  } finally {
-    clearTimeout(timer);
   }
 });

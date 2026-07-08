@@ -15,6 +15,53 @@ const SB_URL = Deno.env.get('SUPABASE_URL') ?? '';
 const SVC = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 const LESSON_HOUR = 13; // local hour to send a lesson suggestion (staggered from reset)
 
+// ── Observability + resilience (structured logs for Supabase log explorer) ───
+const FN = 'daily-nudge';
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+function logErr(where: string, err: unknown, extra: Record<string, unknown> = {}) {
+  const e = err as any;
+  console.error(JSON.stringify({
+    level: 'error', fn: FN, where,
+    error: String(e?.message ?? e),
+    stack: e?.stack ? String(e.stack).split('\n').slice(0, 5).join(' | ') : undefined,
+    ...extra,
+  }));
+}
+function logWarn(where: string, msg: string, extra: Record<string, unknown> = {}) {
+  console.warn(JSON.stringify({ level: 'warn', fn: FN, where, msg, ...extra }));
+}
+function backoffMs(attempt: number, retryAfterSec: number | null): number {
+  if (retryAfterSec && retryAfterSec > 0) return Math.min(15000, retryAfterSec * 1000);
+  return Math.min(8000, 400 * 2 ** attempt) + Math.floor(Math.random() * 250);
+}
+/**
+ * fetch() with retry+exponential backoff on 429 / 5xx (OpenAI rate limits &
+ * transient errors). Honors Retry-After. Each attempt has its own timeout.
+ * Returns the last Response (never throws for HTTP status); throws only if the
+ * network call itself fails on the final attempt.
+ */
+async function fetchRetry(url: string, init: RequestInit, where: string, tries = 3, timeoutMs = 20000): Promise<Response> {
+  let last: Response | null = null;
+  for (let attempt = 0; attempt < tries; attempt++) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+    try {
+      const res = await fetch(url, { ...init, signal: ctrl.signal });
+      clearTimeout(timer);
+      if (res.ok || (res.status !== 429 && res.status < 500)) return res;
+      last = res;
+      logWarn(`${where}.retry`, `upstream ${res.status}`, { attempt: attempt + 1, status: res.status });
+      if (attempt < tries - 1) await sleep(backoffMs(attempt, Number(res.headers.get('retry-after')) || null));
+    } catch (e) {
+      clearTimeout(timer);
+      logErr(`${where}.network`, e, { attempt: attempt + 1 });
+      if (attempt === tries - 1) throw e;
+      await sleep(backoffMs(attempt, null));
+    }
+  }
+  return last as Response;
+}
+
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 }
@@ -74,10 +121,10 @@ async function buildPlan(p: any, lp: any, resets7: any[], resetToday: boolean): 
       `- The "note" is a short, warm in-app message about staying regular with resets AND lessons for best results (1-2 sentences, plain, no emojis).`,
       `Return minified JSON: {"toughness":"low|medium|high","sendReset":true|false,"sendLesson":true|false,"sendCommunity":true|false,"note":"..."}`,
     ].filter(Boolean).join('\n');
-    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    const res = await fetchRetry('https://api.openai.com/v1/chat/completions', {
       method: 'POST', headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ model: OPENAI_MODEL, temperature: 0.5, max_tokens: 200, response_format: { type: 'json_object' }, messages: [{ role: 'system', content: 'You plan kind, sparse notifications and a consistency note. Output ONLY minified JSON.' }, { role: 'user', content: prompt }] }),
-    });
+    }, 'chat');
     if (!res.ok) return fallback;
     const d = JSON.parse((await res.json()).choices[0].message.content);
     return {
@@ -88,7 +135,8 @@ async function buildPlan(p: any, lp: any, resets7: any[], resetToday: boolean): 
       sendCommunity: !!d.sendCommunity,
       note: (typeof d.note === 'string' && d.note.trim()) ? d.note.trim().slice(0, 240) : fallback.note,
     };
-  } catch {
+  } catch (e) {
+    logErr('buildPlan', e);
     return fallback;
   }
 }
@@ -98,12 +146,12 @@ async function resetMessage(name: string, recentSituations: string[]): Promise<{
   if (!OPENAI_API_KEY) return fallback;
   try {
     const prompt = `Write ONE short, warm push nudging a CBT user to do their 2-minute reset today (not done yet).${recentSituations.length ? ' Recent themes: ' + JSON.stringify(recentSituations.slice(0, 4)) + '.' : ''} Non-nagging, no guilt, plain, no emojis.${name && name !== 'there' ? ' You may use "' + name + '" sparingly.' : ''} title<=40, body<=110. JSON {"title":"","body":""}.`;
-    const res = await fetch('https://api.openai.com/v1/chat/completions', { method: 'POST', headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ model: OPENAI_MODEL, temperature: 0.9, max_tokens: 120, response_format: { type: 'json_object' }, messages: [{ role: 'system', content: 'Brief kind reminders. Output ONLY minified JSON.' }, { role: 'user', content: prompt }] }) });
+    const res = await fetchRetry('https://api.openai.com/v1/chat/completions', { method: 'POST', headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ model: OPENAI_MODEL, temperature: 0.9, max_tokens: 120, response_format: { type: 'json_object' }, messages: [{ role: 'system', content: 'Brief kind reminders. Output ONLY minified JSON.' }, { role: 'user', content: prompt }] }) }, 'chat');
     if (!res.ok) return fallback;
     const d = JSON.parse((await res.json()).choices[0].message.content);
     const title = String(d.title ?? '').slice(0, 50).trim(); const body = String(d.body ?? '').slice(0, 140).trim();
     return title && body ? { title, body } : fallback;
-  } catch { return fallback; }
+  } catch (e) { logErr('resetMessage', e); return fallback; }
 }
 
 async function pickLesson(watched: string[]): Promise<{ id: string; title: string } | null> {
@@ -128,7 +176,7 @@ Deno.serve(async (req) => {
   const now = new Date();
   const weekAgo = new Date(now.getTime() - 7 * 86400000).toISOString();
   const res = await sb(`profiles?select=id,name,expo_push_token,reminder_hour,timezone,plan,plan_date,push_last_sent_on,last_lesson_push_on,last_post_on,lessons_watched&reminder_enabled=eq.true&expo_push_token=not.is.null`);
-  if (!res.ok) return json({ error: `profiles ${res.status}` }, 502);
+  if (!res.ok) { logErr('profiles', new Error(`profiles ${res.status}`), { status: res.status }); return json({ error: `profiles ${res.status}` }, 502); }
   const profiles: any[] = await res.json();
 
   // Cheap in-memory pass: only users DUE in this window get any DB/AI work.
@@ -189,9 +237,9 @@ Deno.serve(async (req) => {
   for (let i = 0; i < pushes.length; i += 100) {
     const batch = pushes.slice(i, i + 100);
     try {
-      const pr = await fetch('https://exp.host/--/api/v2/push/send', { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(batch) });
+      const pr = await fetchRetry('https://exp.host/--/api/v2/push/send', { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(batch) }, 'push');
       if (pr.ok) sent += batch.length;
-    } catch {}
+    } catch (e) { logErr('push', e); }
   }
   // one merged PATCH per user
   await Promise.all(Object.entries(patchMap).map(([id, body]) => sb(`profiles?id=eq.${id}`, { method: 'PATCH', body: JSON.stringify(body) })));

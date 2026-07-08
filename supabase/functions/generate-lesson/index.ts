@@ -11,6 +11,53 @@ const CRON_SECRET = Deno.env.get('CRON_SECRET') ?? '';
 const SB_URL = Deno.env.get('SUPABASE_URL') ?? '';
 const SVC = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 
+// ── Observability + resilience (structured logs for Supabase log explorer) ───
+const FN = 'generate-lesson';
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+function logErr(where: string, err: unknown, extra: Record<string, unknown> = {}) {
+  const e = err as any;
+  console.error(JSON.stringify({
+    level: 'error', fn: FN, where,
+    error: String(e?.message ?? e),
+    stack: e?.stack ? String(e.stack).split('\n').slice(0, 5).join(' | ') : undefined,
+    ...extra,
+  }));
+}
+function logWarn(where: string, msg: string, extra: Record<string, unknown> = {}) {
+  console.warn(JSON.stringify({ level: 'warn', fn: FN, where, msg, ...extra }));
+}
+function backoffMs(attempt: number, retryAfterSec: number | null): number {
+  if (retryAfterSec && retryAfterSec > 0) return Math.min(15000, retryAfterSec * 1000);
+  return Math.min(8000, 400 * 2 ** attempt) + Math.floor(Math.random() * 250);
+}
+/**
+ * fetch() with retry+exponential backoff on 429 / 5xx (OpenAI rate limits &
+ * transient errors). Honors Retry-After. Each attempt has its own timeout.
+ * Returns the last Response (never throws for HTTP status); throws only if the
+ * network call itself fails on the final attempt.
+ */
+async function fetchRetry(url: string, init: RequestInit, where: string, tries = 3, timeoutMs = 20000): Promise<Response> {
+  let last: Response | null = null;
+  for (let attempt = 0; attempt < tries; attempt++) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+    try {
+      const res = await fetch(url, { ...init, signal: ctrl.signal });
+      clearTimeout(timer);
+      if (res.ok || (res.status !== 429 && res.status < 500)) return res;
+      last = res;
+      logWarn(`${where}.retry`, `upstream ${res.status}`, { attempt: attempt + 1, status: res.status });
+      if (attempt < tries - 1) await sleep(backoffMs(attempt, Number(res.headers.get('retry-after')) || null));
+    } catch (e) {
+      clearTimeout(timer);
+      logErr(`${where}.network`, e, { attempt: attempt + 1 });
+      if (attempt === tries - 1) throw e;
+      await sleep(backoffMs(attempt, null));
+    }
+  }
+  return last as Response;
+}
+
 const CATEGORIES = ['Foundations', 'Skills', 'Emotional pulls', 'Everyday scenarios'];
 const GRADIENTS: [string, string][] = [
   ['#A99BD4', '#74C7B8'], ['#74C7B8', '#4f9c8f'], ['#A99BD4', '#7b6cb0'],
@@ -35,7 +82,8 @@ async function existingTitles(): Promise<string[]> {
     });
     const rows = await res.json();
     return Array.isArray(rows) ? rows.map((r: any) => r.title) : [];
-  } catch {
+  } catch (e) {
+    logErr('existingTitles', e);
     return [];
   }
 }
@@ -58,7 +106,7 @@ Deno.serve(async (req) => {
 
   let data: any;
   try {
-    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    const res = await fetchRetry('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -68,10 +116,11 @@ Deno.serve(async (req) => {
         response_format: { type: 'json_object' },
         messages: [{ role: 'system', content: SYSTEM }, { role: 'user', content: prompt }],
       }),
-    });
-    if (!res.ok) return json({ error: `OpenAI ${res.status}` }, 502);
+    }, 'chat');
+    if (!res.ok) { logErr('chat', new Error(`OpenAI ${res.status}`), { status: res.status }); return json({ error: `OpenAI ${res.status}` }, 502); }
     data = JSON.parse((await res.json()).choices[0].message.content);
   } catch (e) {
+    logErr('chat', e);
     return json({ error: String((e as Error)?.message ?? e) }, 502);
   }
 
@@ -103,8 +152,9 @@ Deno.serve(async (req) => {
       headers: { apikey: SVC, Authorization: `Bearer ${SVC}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
       body: JSON.stringify(row),
     });
-    if (!res.ok) return json({ error: `insert ${res.status}: ${(await res.text()).slice(0, 200)}` }, 502);
+    if (!res.ok) { logErr('insert', new Error(`insert ${res.status}`), { status: res.status }); return json({ error: `insert ${res.status}: ${(await res.text()).slice(0, 200)}` }, 502); }
   } catch (e) {
+    logErr('insert', e);
     return json({ error: String((e as Error)?.message ?? e) }, 502);
   }
 

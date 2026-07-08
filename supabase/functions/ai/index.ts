@@ -38,7 +38,53 @@ function isAuthedUser(req: Request): boolean {
 
 const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY') ?? '';
 const OPENAI_MODEL = Deno.env.get('OPENAI_MODEL') ?? 'gpt-4o-mini';
-const TIMEOUT_MS = 15000;
+
+// ── Observability + resilience (structured logs for Supabase log explorer) ───
+const FN = 'ai';
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+function logErr(where: string, err: unknown, extra: Record<string, unknown> = {}) {
+  const e = err as any;
+  console.error(JSON.stringify({
+    level: 'error', fn: FN, where,
+    error: String(e?.message ?? e),
+    stack: e?.stack ? String(e.stack).split('\n').slice(0, 5).join(' | ') : undefined,
+    ...extra,
+  }));
+}
+function logWarn(where: string, msg: string, extra: Record<string, unknown> = {}) {
+  console.warn(JSON.stringify({ level: 'warn', fn: FN, where, msg, ...extra }));
+}
+function backoffMs(attempt: number, retryAfterSec: number | null): number {
+  if (retryAfterSec && retryAfterSec > 0) return Math.min(15000, retryAfterSec * 1000);
+  return Math.min(8000, 400 * 2 ** attempt) + Math.floor(Math.random() * 250);
+}
+/**
+ * fetch() with retry+exponential backoff on 429 / 5xx (OpenAI rate limits &
+ * transient errors). Honors Retry-After. Each attempt has its own timeout.
+ * Returns the last Response (never throws for HTTP status); throws only if the
+ * network call itself fails on the final attempt.
+ */
+async function fetchRetry(url: string, init: RequestInit, where: string, tries = 3, timeoutMs = 20000): Promise<Response> {
+  let last: Response | null = null;
+  for (let attempt = 0; attempt < tries; attempt++) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+    try {
+      const res = await fetch(url, { ...init, signal: ctrl.signal });
+      clearTimeout(timer);
+      if (res.ok || (res.status !== 429 && res.status < 500)) return res;
+      last = res;
+      logWarn(`${where}.retry`, `upstream ${res.status}`, { attempt: attempt + 1, status: res.status });
+      if (attempt < tries - 1) await sleep(backoffMs(attempt, Number(res.headers.get('retry-after')) || null));
+    } catch (e) {
+      clearTimeout(timer);
+      logErr(`${where}.network`, e, { attempt: attempt + 1 });
+      if (attempt === tries - 1) throw e;
+      await sleep(backoffMs(attempt, null));
+    }
+  }
+  return last as Response;
+}
 
 const SYSTEM_PROMPT =
   `You are a senior, expert, evidence-backed CBT therapist writing micro-guidance inside a self-help app.
@@ -63,46 +109,40 @@ function localCrisisCheck(text: string): boolean {
 async function moderationFlagged(text: string): Promise<boolean> {
   if (!text) return false;
   try {
-    const res = await fetch('https://api.openai.com/v1/moderations', {
+    const res = await fetchRetry('https://api.openai.com/v1/moderations', {
       method: 'POST',
       headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ model: 'omni-moderation-latest', input: text }),
-    });
+    }, 'moderation');
     if (!res.ok) return false; // fail open on moderation infra errors (crisis regex still guards)
     const data = await res.json();
     return !!data?.results?.[0]?.flagged;
-  } catch {
+  } catch (e) {
+    logErr('moderationFlagged', e);
     return false;
   }
 }
 
 async function chatJSON(userContent: string, temperature = 0.8, maxTokens = 750): Promise<any> {
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
-  try {
-    const res = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      signal: ctrl.signal,
-      headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: OPENAI_MODEL,
-        temperature,
-        max_tokens: maxTokens,
-        response_format: { type: 'json_object' },
-        messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: userContent },
-        ],
-      }),
-    });
-    if (!res.ok) throw new Error(`OpenAI ${res.status}`);
-    const j = await res.json();
-    const content = j?.choices?.[0]?.message?.content;
-    if (!content) throw new Error('OpenAI empty');
-    return JSON.parse(content);
-  } finally {
-    clearTimeout(timer);
-  }
+  const res = await fetchRetry('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: OPENAI_MODEL,
+      temperature,
+      max_tokens: maxTokens,
+      response_format: { type: 'json_object' },
+      messages: [
+        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'user', content: userContent },
+      ],
+    }),
+  }, 'chat');
+  if (!res.ok) throw new Error(`OpenAI ${res.status}`);
+  const j = await res.json();
+  const content = j?.choices?.[0]?.message?.content;
+  if (!content) throw new Error('OpenAI empty');
+  return JSON.parse(content);
 }
 
 const crisisResult = () => ({ crisis: true, validate: '', reframe: '', smallStep: '', narration: '', keywords: [], distortion: '', tool: 'none', toolVariant: '' });
@@ -284,6 +324,7 @@ Deno.serve(async (req) => {
         return json({ error: `Unknown action: ${action}` }, 400);
     }
   } catch (e) {
+    logErr('handler', e, { action });
     return json({ error: String((e as Error)?.message ?? e) }, 502);
   }
 });

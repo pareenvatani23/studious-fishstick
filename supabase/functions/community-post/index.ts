@@ -9,6 +9,53 @@ const OPENAI_MODEL = Deno.env.get('OPENAI_MODEL') ?? 'gpt-4o-mini';
 const SB_URL = Deno.env.get('SUPABASE_URL') ?? '';
 const SVC = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 
+// ── Observability + resilience (structured logs for Supabase log explorer) ───
+const FN = 'community-post';
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+function logErr(where: string, err: unknown, extra: Record<string, unknown> = {}) {
+  const e = err as any;
+  console.error(JSON.stringify({
+    level: 'error', fn: FN, where,
+    error: String(e?.message ?? e),
+    stack: e?.stack ? String(e.stack).split('\n').slice(0, 5).join(' | ') : undefined,
+    ...extra,
+  }));
+}
+function logWarn(where: string, msg: string, extra: Record<string, unknown> = {}) {
+  console.warn(JSON.stringify({ level: 'warn', fn: FN, where, msg, ...extra }));
+}
+function backoffMs(attempt: number, retryAfterSec: number | null): number {
+  if (retryAfterSec && retryAfterSec > 0) return Math.min(15000, retryAfterSec * 1000);
+  return Math.min(8000, 400 * 2 ** attempt) + Math.floor(Math.random() * 250);
+}
+/**
+ * fetch() with retry+exponential backoff on 429 / 5xx (OpenAI rate limits &
+ * transient errors). Honors Retry-After. Each attempt has its own timeout.
+ * Returns the last Response (never throws for HTTP status); throws only if the
+ * network call itself fails on the final attempt.
+ */
+async function fetchRetry(url: string, init: RequestInit, where: string, tries = 3, timeoutMs = 20000): Promise<Response> {
+  let last: Response | null = null;
+  for (let attempt = 0; attempt < tries; attempt++) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+    try {
+      const res = await fetch(url, { ...init, signal: ctrl.signal });
+      clearTimeout(timer);
+      if (res.ok || (res.status !== 429 && res.status < 500)) return res;
+      last = res;
+      logWarn(`${where}.retry`, `upstream ${res.status}`, { attempt: attempt + 1, status: res.status });
+      if (attempt < tries - 1) await sleep(backoffMs(attempt, Number(res.headers.get('retry-after')) || null));
+    } catch (e) {
+      clearTimeout(timer);
+      logErr(`${where}.network`, e, { attempt: attempt + 1 });
+      if (attempt === tries - 1) throw e;
+      await sleep(backoffMs(attempt, null));
+    }
+  }
+  return last as Response;
+}
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -45,10 +92,10 @@ function handleFromName(name: string, uid: string): string {
 }
 async function moderationFlagged(text: string): Promise<boolean> {
   try {
-    const res = await fetch('https://api.openai.com/v1/moderations', { method: 'POST', headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ model: 'omni-moderation-latest', input: text }) });
+    const res = await fetchRetry('https://api.openai.com/v1/moderations', { method: 'POST', headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ model: 'omni-moderation-latest', input: text }) }, 'moderation');
     if (!res.ok) return false;
     return !!(await res.json())?.results?.[0]?.flagged;
-  } catch { return false; }
+  } catch (e) { logErr('moderationFlagged', e); return false; }
 }
 async function qualityCheck(text: string): Promise<{ ok: boolean; score: number; reason: string }> {
   if (!OPENAI_API_KEY) return { ok: true, score: 70, reason: '' };
@@ -60,11 +107,12 @@ async function qualityCheck(text: string): Promise<{ ok: boolean; score: number;
       `Score 0-100 for how genuinely positive, kind, and helpful it is to a stranger. ok=true only if it clearly belongs and score>=60.`,
       `Return minified JSON: {"ok":true|false,"score":0-100,"reason":"short reason if not ok"}`,
     ].join('\n');
-    const res = await fetch('https://api.openai.com/v1/chat/completions', { method: 'POST', headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ model: OPENAI_MODEL, temperature: 0.2, max_tokens: 120, response_format: { type: 'json_object' }, messages: [{ role: 'system', content: 'You are a strict but fair moderator for a kindness-only feed. Output ONLY minified JSON.' }, { role: 'user', content: prompt }] }) });
+    const res = await fetchRetry('https://api.openai.com/v1/chat/completions', { method: 'POST', headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ model: OPENAI_MODEL, temperature: 0.2, max_tokens: 120, response_format: { type: 'json_object' }, messages: [{ role: 'system', content: 'You are a strict but fair moderator for a kindness-only feed. Output ONLY minified JSON.' }, { role: 'user', content: prompt }] }) }, 'chat');
     if (!res.ok) return { ok: true, score: 65, reason: '' };
     const d = JSON.parse((await res.json()).choices[0].message.content);
     return { ok: !!d.ok && Number(d.score) >= 60, score: Math.max(0, Math.min(100, Number(d.score) || 0)), reason: String(d.reason ?? '') };
-  } catch {
+  } catch (e) {
+    logErr('qualityCheck', e);
     return { ok: true, score: 65, reason: '' };
   }
 }
@@ -107,7 +155,7 @@ Deno.serve(async (req) => {
 
   const nowIso = new Date().toISOString();
   const ins = await sb('posts', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ user_id: uid, text, status: 'published', quality_score: qc.score, published_at: nowIso, author_label: authorLabel }) });
-  if (!ins.ok) return json({ error: `insert ${ins.status}` }, 502);
+  if (!ins.ok) { logErr('insert', new Error(`insert ${ins.status}`), { status: ins.status }); return json({ error: `insert ${ins.status}` }, 502); }
   const row = (await ins.json())[0];
   await sb(`profiles?id=eq.${uid}`, { method: 'PATCH', body: JSON.stringify({ last_post_on: nowIso.slice(0, 10) }) });
 
