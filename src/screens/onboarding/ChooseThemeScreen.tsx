@@ -18,7 +18,7 @@ export function ChooseThemeScreen({ navigation }: Props) {
   const c = theme.colors;
 
   return (
-    <Screen bottom={<Button label="Next" onPress={() => navigation.navigate('TextSize')} />}>
+    <Screen bottom={<Button label="Next" onPress={() => navigation.navigate('Reminders')} />}>
       <AppText size={27} weight="700" style={{ marginTop: spacing.lg }}>Pick a look that feels calm</AppText>
       <AppText size={15} color={c.text2} style={{ marginTop: spacing.md }} lineHeightMultiple={1.4}>
         Tap to preview. You can change it anytime in your profile.

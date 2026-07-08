@@ -27,7 +27,12 @@ export function ReadyScreen(_: Props) {
         </View>
         <AppText size={30} weight="700">You're all set.</AppText>
         <AppText size={18} color={c.text1} align="center" lineHeightMultiple={1.5}>
-          Open the app whenever something feels heavy. One small step is enough.
+          Open the app whenever something feels heavy. You name what’s on your
+          mind; we help you see it more kindly and take one small step.
+        </AppText>
+        <AppText size={14} color={c.text2} align="center" lineHeightMultiple={1.5} style={{ marginTop: spacing.sm }}>
+          Private by default, and only the gentlest of reminders. This is
+          self-help — not therapy or a crisis service.
         </AppText>
       </View>
     </Screen>

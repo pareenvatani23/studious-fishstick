@@ -48,26 +48,24 @@ async function ownSets(): Promise<{ reacted: Set<string>; saved: Set<string> }> 
   return { reacted, saved };
 }
 
-function rank(posts: Post[]): Post[] {
-  const now = Date.now();
+const postTime = (p: Post) => new Date(p.published_at || p.created_at).getTime();
+
+/** Dedup by text, keeping the earliest of any duplicates. */
+function dedup(posts: Post[]): Post[] {
   const seen = new Set<string>();
-  return posts
-    .filter((p) => {
-      const key = p.text.toLowerCase().replace(/\s+/g, ' ').trim();
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    })
-    .map((p) => {
-      const ageDays = (now - new Date(p.published_at || p.created_at).getTime()) / 86400000;
-      const freshness = Math.max(0, 8 - ageDays); // gentle recency boost
-      return { p, score: p.quality_score + p.helped_count * 3 + freshness };
-    })
-    .sort((a, b) => b.score - a.score)
-    .map((x) => x.p);
+  return posts.filter((p) => {
+    const key = p.text.toLowerCase().replace(/\s+/g, ' ').trim();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
-/** The finite "Daily Drop": a hero + a small curated set (never endless). */
+/**
+ * The finite "Daily Drop": recency-first so EVERY new post is seen (the whole
+ * point — one message that helps a stranger). We feature one well-loved "gem"
+ * as the hero, then show the most recent posts so nothing fresh gets buried.
+ */
 export async function fetchFeed(): Promise<{ hero: Post | null; drop: Post[] }> {
   if (!supabase) return { hero: null, drop: [] };
   const since = new Date(Date.now() - 14 * 86400000).toISOString();
@@ -80,8 +78,20 @@ export async function fetchFeed(): Promise<{ hero: Post | null; drop: Post[] }> 
     .limit(60);
   if (error || !data) return { hero: null, drop: [] };
   const { reacted, saved } = await ownSets();
-  const ranked = rank(data as Post[]).map((p) => ({ ...p, reacted: reacted.has(p.id), saved: saved.has(p.id) }));
-  return { hero: ranked[0] ?? null, drop: ranked.slice(1, 13) };
+  const all = dedup(data as Post[]).map((p) => ({ ...p, reacted: reacted.has(p.id), saved: saved.has(p.id) }));
+  if (!all.length) return { hero: null, drop: [] };
+
+  const byRecent = [...all].sort((a, b) => postTime(b) - postTime(a));
+  // Hero = a beloved gem (most "helped", then highest quality) — but only from
+  // reasonably recent posts, so the feed still feels current.
+  const heroPool = byRecent.slice(0, 20);
+  const hero = [...heroPool].sort(
+    (a, b) => b.helped_count - a.helped_count || b.quality_score - a.quality_score || postTime(b) - postTime(a)
+  )[0];
+  // Drop = the most recent posts (excluding the hero), so a just-shared message
+  // always appears near the top.
+  const drop = byRecent.filter((p) => p.id !== hero.id).slice(0, 14);
+  return { hero, drop };
 }
 
 /** Posts the user saved, newest first. */

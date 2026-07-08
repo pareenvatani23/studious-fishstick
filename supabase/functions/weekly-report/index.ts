@@ -195,20 +195,26 @@ async function buildPdf(name: string, range: string, agg: any, summary: string, 
   } else { text('—', M, y, 11, font, MUTED); y -= 16; }
   y -= 10;
 
-  // Thought cloud
+  // Thought cloud — fixed-height chips laid out in rows (no overlap with the
+  // label above or the section below).
   sectionLabel('Your thoughts this week');
   if (agg.keywords.length) {
     const maxK = agg.keywords[0][1];
+    const rowH = 26;      // full row pitch, always >= chip height
+    const chipH = 20;     // chip box height
+    y -= 6;               // headroom so the first (tallest) chip clears the label
+    ensure(rowH);
     let x = M;
     for (const [word, n] of agg.keywords) {
-      const size = 10 + Math.round((n / maxK) * 10);
+      const size = 10 + Math.round((n / maxK) * 5); // 10..15, capped so chips fit chipH
       const w = font.widthOfTextAtSize(word, size) + 14;
-      if (x + w > M + W) { x = M; y -= 26; ensure(26); }
-      rect(x, y - 6, w, size + 8, { color: rgb(0.95, 0.93, 0.98), borderColor: rgb(0.85, 0.82, 0.92), borderWidth: 0.5 });
-      text(word, x + 7, y, size, font, rgb(0.42, 0.36, 0.6));
+      if (x + w > M + W) { x = M; y -= rowH; ensure(rowH); }
+      rect(x, y - chipH, w, chipH, { color: rgb(0.95, 0.93, 0.98), borderColor: rgb(0.85, 0.82, 0.92), borderWidth: 0.5 });
+      // vertically centre the baseline inside the chip box
+      text(word, x + 7, y - chipH + (chipH - size) / 2 + 2, size, font, rgb(0.42, 0.36, 0.6));
       x += w + 8;
     }
-    y -= 30;
+    y -= rowH + 6;        // clear gap before the next section
   } else { text('—', M, y, 11, font, MUTED); y -= 20; }
 
   // What resonated (community messages the user reacted to / saved)

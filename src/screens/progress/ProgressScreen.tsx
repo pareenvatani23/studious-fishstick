@@ -146,17 +146,24 @@ export function ProgressScreen() {
             <AppText size={12} weight="700" color={c.lavender}>{consistency}</AppText>
           </View>
         </View>
-        <View style={{ flexDirection: 'row', gap: spacing.xl, marginTop: spacing.md }}>
+        <View style={{ flexDirection: 'row', gap: spacing.xl, marginTop: spacing.md, alignItems: 'flex-start' }}>
           <View>
-            <AppText size={22} weight="700" color={c.teal}>{active14}<AppText size={13} color={c.muted}>/14</AppText></AppText>
+            <View style={{ flexDirection: 'row', alignItems: 'baseline', height: 28 }}>
+              <AppText size={22} weight="700" color={c.teal}>{active14}</AppText>
+              <AppText size={13} color={c.muted}>/14</AppText>
+            </View>
             <AppText size={12} color={c.muted}>Active days</AppText>
           </View>
           <View>
-            <AppText size={22} weight="700" color={c.lavender}>{lessonsWatched.length}</AppText>
+            <View style={{ height: 28, justifyContent: 'flex-end' }}>
+              <AppText size={22} weight="700" color={c.lavender}>{lessonsWatched.length}</AppText>
+            </View>
             <AppText size={12} color={c.muted}>Lessons learned</AppText>
           </View>
           <View>
-            <AppText size={22} weight="700" color={c.success}>{toolPractices}</AppText>
+            <View style={{ height: 28, justifyContent: 'flex-end' }}>
+              <AppText size={22} weight="700" color={c.success}>{toolPractices}</AppText>
+            </View>
             <AppText size={12} color={c.muted}>Tools used</AppText>
           </View>
         </View>
