@@ -18,8 +18,14 @@ so you touch the right files and don't recreate logic that already exists.
 - **AI reframe ("core") + narration:** `src/screens/reset/NarrationScreen.tsx`
   → calls edge `ai` via `src/ai/edge.ts`; prompts/types in `src/ai/openai.ts`.
   Voice is **play-on-tap** (not auto-synth), OpenAI TTS, cached.
-- **Tools (optional, inline from a step):** breathing / grounding / journal —
-  `src/screens/tools/*`, `src/tools/*`. Tool variants: box / 4-7-8 / paced.
+- **Tools (9, inline from a step OR standalone):** breathing (box/4-7-8/paced),
+  grounding (5-4-3-2-1), journal, worry postponement, behavioural activation,
+  self-compassion, gratitude (three good things), urge surfing, progressive
+  muscle relaxation. Screens in `src/screens/tools/*`; shared `src/tools/catalog.ts`
+  drives the reset "Do it now" launcher, labels, and the Tools hub
+  (`ToolsHubScreen`, Home → "See all"); completion recorded via
+  `src/tools/toolFinish.ts`. The AI `tool` field (edge `ai`) routes each small
+  step to the most specific tool.
 - **Close:** `src/screens/reset/DoneScreen.tsx` — animated check + rotating
   celebratory message ("You did it"), reduce-motion aware.
 
