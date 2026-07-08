@@ -8,7 +8,19 @@ import { invokeAI } from './edge';
  * we keep a cheap local crisis pre-check for an instant, offline response.
  */
 
-export type ToolKind = 'breathing' | 'grounding' | 'journal' | 'none';
+export type ToolKind =
+  | 'breathing'
+  | 'grounding'
+  | 'journal'
+  | 'worry'
+  | 'activation'
+  | 'selfcompassion'
+  | 'gratitude'
+  | 'urgesurf'
+  | 'relax'
+  | 'none';
+
+export const TOOL_KINDS: ToolKind[] = ['breathing', 'grounding', 'journal', 'worry', 'activation', 'selfcompassion', 'gratitude', 'urgesurf', 'relax', 'none'];
 
 /** Structured result for one reset. */
 export interface AIReset {
@@ -70,7 +82,7 @@ export async function generateReset(input: GenerateInput): Promise<AIReset> {
   if (localCrisisCheck(userText) || localCrisisCheck(input.situationLabel)) return crisisResult();
 
   const data = await invokeAI<Partial<AIReset>>('generateReset', input);
-  const tool = (['breathing', 'grounding', 'journal', 'none'] as const).includes(data.tool as any) ? (data.tool as ToolKind) : 'none';
+  const tool = TOOL_KINDS.includes(data.tool as any) ? (data.tool as ToolKind) : 'none';
   return {
     crisis: Boolean(data.crisis),
     validate: String(data.validate ?? ''),

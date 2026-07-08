@@ -152,7 +152,20 @@ async function generateReset(input: any) {
     `- "reframe" is a fuller cognitive restructuring — 3 to 4 sentences: (1) name the thinking trap gently, (2) offer the balanced alternative thought, (3) give a brief reason it holds up (evidence for/against, grounded in THEIR situation). Do NOT begin with "Another way", "Maybe", "Perhaps", or "Try to". Warm, plain, concrete.`,
     `- If a thinking pattern from BACKGROUND clearly recurs here, gently connect this moment to that pattern and BUILD on prior work (progress, not repetition) — without sounding like you're reciting a file.`,
     `- "smallStep": vary the TYPE across CBT techniques — behavioural experiment, opposite action, urge-surf/delay, values-based action, grounding, self-compassion, reaching out, problem-solving, breathing, or journaling — pick what best fits. When it fits, PREFER a technique the user actually follows through on (see BACKGROUND follow-through/tools). Always concrete, with a when/where and a tiny time that fits RIGHT NOW.`,
-    `- Set "tool" to the in-app tool that best supports the smallStep: "breathing" (paced/box/4-7-8 breathing), "grounding" (5-4-3-2-1 senses), "journal" (writing a thought/worry down), or "none" (step needs no in-app tool, e.g. texting a friend). If "breathing", set "toolVariant" to "box", "478", or "paced"; otherwise leave "toolVariant" empty. The smallStep wording must match the chosen tool.`,
+    `- Set "tool" to the in-app tool that best supports the smallStep (the app can launch it in one tap, so PREFER a real tool over "none" whenever one genuinely fits):`,
+    `    • "breathing" — paced/box/4-7-8 breathing, for anxiety/panic/overwhelm/racing body.`,
+    `    • "grounding" — 5-4-3-2-1 senses, for dissociation, spiralling, feeling unreal or flooded.`,
+    `    • "journal" — writing the thought/worry out, for tangled or unclear thoughts.`,
+    `    • "worry" — worry postponement (park it until a set time), for rumination, "can't switch off", over-worrying about the future.`,
+    `    • "activation" — pick one tiny action to do now, for low mood, stuck, unmotivated, avoidant, flat.`,
+    `    • "selfcompassion" — a short self-kindness break, for self-criticism, shame, guilt, being hard on themselves.`,
+    `    • "gratitude" — name three good things, for negativity bias, hopelessness, comparison, "nothing's good".`,
+    `    • "urgesurf" — ride an urge like a wave, for cravings, impulses, checking, the pull to react/lash out.`,
+    `    • "relax" — progressive muscle relaxation, for physical tension, clenching, stress held in the body.`,
+    `    • "none" — only when the step truly needs no in-app tool (e.g. texting a friend, a real-world errand).`,
+    `  If "breathing", set "toolVariant" to "box", "478", or "paced"; otherwise leave "toolVariant" empty. The smallStep wording must MATCH the chosen tool (e.g. if tool is "worry", the step is about parking the worry).`,
+    `- CRITICAL: pick the MOST SPECIFIC tool, and do NOT default to "journal" or "breathing" when a more specific one fits. Concretely: ruminating / "can't switch off" / worrying about a future event → "worry" (NOT journal). Body tension / clenched jaw or shoulders / stress held physically → "relax" (NOT breathing). Self-criticism / shame / guilt → "selfcompassion". Low mood / flat / stuck / unmotivated → "activation". Use "journal" ONLY for genuinely tangled/unclear thoughts that need untangling, and "breathing" for acute anxiety/panic in the body.`,
+    `- Two easy-to-confuse cases, get these RIGHT: (a) any URGE, craving, or impulse to DO something they'll regret (text an ex, check a phone, drink, lash out, keep checking) → "urgesurf" — the whole point is to ride it out WITHOUT acting or over-analysing, so NEVER pick "journal" for an urge. (b) hopelessness / "nothing feels good" / bleak / negativity bias → "gratitude" (name a few GOOD things) — this is NOT the same as "grounding" (which is only for sensory overwhelm / feeling unreal / dissociation), so do NOT pick "grounding" for low mood or bleakness.`,
     `- "narration" is the SPOKEN version, read aloud to the user in a warm therapist's voice — this matters most. It is NOT a summary of the text above; it is a gentle, human, compassionate mini-session (about 6-9 sentences). Speak directly to them as "you". Open by genuinely meeting them where they are (name the feeling and the specific moment), like someone who knows them and remembers what they've been carrying lately. Then softly offer the reframe as a shift in perspective, in your own warmer spoken words. Then invite the one small step as something kind they can do for themselves right now. Use natural spoken rhythm — short sentences, gentle pauses with commas and ellipses, breathing room. Be tender and unhurried, never clinical, never a checklist. If their history shows a recurring pattern or real progress, acknowledge it warmly ("I've noticed you keep coming back to this, and that takes courage"). End with one quiet, reassuring line. No emojis, no headings, no stage directions.`,
     `- Vary phrasing each time; do not sound templated.`,
     `Return minified JSON with exactly these keys:`,
@@ -163,12 +176,13 @@ async function generateReset(input: any) {
     `"narration":"a warm, human, spoken 6-9 sentence compassionate script as described above, natural speech rhythm (<=900 chars)",`,
     `"keywords":["2-4 short lowercase thought tags, e.g. 'mind-reading','self-criticism'"],`,
     `"distortion":"one plain-language thinking pattern name, or empty string",`,
-    `"tool":"breathing|grounding|journal|none",`,
+    `"tool":"breathing|grounding|journal|worry|activation|selfcompassion|gratitude|urgesurf|relax|none",`,
     `"toolVariant":"box|478|paced|"}`,
   ].filter(Boolean).join('\n');
 
+  const TOOLS = ['breathing', 'grounding', 'journal', 'worry', 'activation', 'selfcompassion', 'gratitude', 'urgesurf', 'relax', 'none'];
   const data = await chatJSON(prompt, 0.8, 1200); // roomier: the spoken narration is longer now
-  const tool = ['breathing', 'grounding', 'journal', 'none'].includes(data.tool) ? data.tool : 'none';
+  const tool = TOOLS.includes(data.tool) ? data.tool : 'none';
   const out = {
     crisis: Boolean(data.crisis),
     validate: String(data.validate ?? ''),

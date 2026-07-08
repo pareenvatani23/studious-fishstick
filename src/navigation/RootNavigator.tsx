@@ -34,6 +34,13 @@ import { ResetDetailScreen } from '../screens/progress/ResetDetailScreen';
 import { BreathingScreen } from '../screens/tools/BreathingScreen';
 import { GroundingScreen } from '../screens/tools/GroundingScreen';
 import { JournalScreen } from '../screens/tools/JournalScreen';
+import { WorryScreen } from '../screens/tools/WorryScreen';
+import { ActivationScreen } from '../screens/tools/ActivationScreen';
+import { SelfCompassionScreen } from '../screens/tools/SelfCompassionScreen';
+import { GratitudeScreen } from '../screens/tools/GratitudeScreen';
+import { UrgeSurfScreen } from '../screens/tools/UrgeSurfScreen';
+import { RelaxScreen } from '../screens/tools/RelaxScreen';
+import { ToolsHubScreen } from '../screens/tools/ToolsHubScreen';
 import { VideoLessonScreen } from '../screens/explore/VideoLessonScreen';
 import { HowToUseScreen } from '../screens/profile/HowToUseScreen';
 import { ThemePickerScreen } from '../screens/profile/ThemePickerScreen';
@@ -112,6 +119,13 @@ export function RootNavigator() {
             <Stack.Screen name="ToolBreathing" component={BreathingScreen} />
             <Stack.Screen name="ToolGrounding" component={GroundingScreen} />
             <Stack.Screen name="ToolJournal" component={JournalScreen} />
+            <Stack.Screen name="ToolWorry" component={WorryScreen} />
+            <Stack.Screen name="ToolActivation" component={ActivationScreen} />
+            <Stack.Screen name="ToolSelfCompassion" component={SelfCompassionScreen} />
+            <Stack.Screen name="ToolGratitude" component={GratitudeScreen} />
+            <Stack.Screen name="ToolUrgeSurf" component={UrgeSurfScreen} />
+            <Stack.Screen name="ToolRelax" component={RelaxScreen} />
+            <Stack.Screen name="ToolsHub" component={ToolsHubScreen} />
             {/* detail / settings */}
             <Stack.Screen name="VideoLesson" component={VideoLessonScreen} />
             <Stack.Screen name="HowToUse" component={HowToUseScreen} />

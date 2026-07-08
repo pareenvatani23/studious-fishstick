@@ -14,9 +14,10 @@ import { useResetFlow } from '../../store/ResetFlow';
 import { useRootNav } from '../../navigation/hooks';
 import { situationById } from '../../data/situations';
 import { aiEnabled, voiceEnabled } from '../../ai/config';
-import { generateReset } from '../../ai/openai';
+import { generateReset, type ToolKind } from '../../ai/openai';
 import { synthesize, RESET_VOICE } from '../../ai/elevenlabs';
 import { fetchRecentResonant } from '../../supabase/community';
+import { toolByKey } from '../../tools/catalog';
 import { radius, spacing } from '../../theme/tokens';
 
 /**
@@ -32,7 +33,7 @@ interface Content {
   narration: string;
   keywords: string[];
   distortion: string;
-  tool: 'breathing' | 'grounding' | 'journal' | 'none';
+  tool: ToolKind;
   toolVariant: string;
   source: 'ai' | 'fallback';
 }
@@ -250,10 +251,12 @@ export function NarrationScreen() {
   const toolDone = (draft.toolsUsed ?? []).some((t) => t.completed);
   const launchTool = async () => {
     if (!content) return;
+    const def = toolByKey(content.tool);
+    if (!def) return;
     await stopAudio();
-    if (content.tool === 'breathing') nav.navigate('ToolBreathing', { mode: 'action', variant: content.toolVariant || 'box' });
-    else if (content.tool === 'grounding') nav.navigate('ToolGrounding', { mode: 'action' });
-    else if (content.tool === 'journal') nav.navigate('ToolJournal', { mode: 'action' });
+    const params: any = { mode: 'action', ...(def.params ?? {}) };
+    if (content.tool === 'breathing') params.variant = content.toolVariant || 'box';
+    nav.navigate(def.route as any, params);
   };
 
   if (loading || !content) {
@@ -312,7 +315,7 @@ export function NarrationScreen() {
           ) : (
             <View style={{ marginTop: spacing.md }}>
               <Button
-                label={content.tool === 'breathing' ? 'Do the breathing now' : content.tool === 'grounding' ? 'Do the grounding now' : 'Write it now'}
+                label={toolByKey(content.tool)?.action ?? 'Try it now'}
                 onPress={launchTool}
               />
             </View>

@@ -37,6 +37,13 @@ export type RootStackParamList = {
   ToolBreathing: { mode?: 'action' | 'standalone'; variant?: string } | undefined;
   ToolGrounding: { mode?: 'action' | 'standalone' } | undefined;
   ToolJournal: { mode?: 'action' | 'standalone'; prompt?: string } | undefined;
+  ToolWorry: { mode?: 'action' | 'standalone' } | undefined;
+  ToolActivation: { mode?: 'action' | 'standalone' } | undefined;
+  ToolSelfCompassion: { mode?: 'action' | 'standalone' } | undefined;
+  ToolGratitude: { mode?: 'action' | 'standalone' } | undefined;
+  ToolUrgeSurf: { mode?: 'action' | 'standalone' } | undefined;
+  ToolRelax: { mode?: 'action' | 'standalone' } | undefined;
+  ToolsHub: undefined;
 
   // Detail / settings
   VideoLesson: { lessonId: string };

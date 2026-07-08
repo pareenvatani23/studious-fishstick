@@ -56,7 +56,12 @@ export function HomeScreen() {
       </AppText>
 
       {/* Quick tools — usable any time, not only inside a reset */}
-      <SectionLabel style={{ marginTop: spacing.xxxl }}>Calm-down tools</SectionLabel>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.xxxl }}>
+        <SectionLabel style={{ marginTop: 0 }}>Calm-down tools</SectionLabel>
+        <Pressable onPress={() => nav.navigate('ToolsHub')} accessibilityRole="button" accessibilityLabel="See all tools" hitSlop={8}>
+          <AppText size={13} weight="600" color={c.teal}>See all</AppText>
+        </Pressable>
+      </View>
       <View style={{ flexDirection: 'row', gap: spacing.md, marginTop: spacing.md }}>
         {([
           { label: 'Breathe', sub: 'Box · 4-7-8', icon: 'breathe' as IconName, go: () => nav.navigate('ToolBreathing', { mode: 'standalone', variant: 'box' }) },
